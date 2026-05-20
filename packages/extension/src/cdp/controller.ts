@@ -1,0 +1,81 @@
+export class CDPController {
+  private attachedTabs = new Set<number>();
+  private currentTabId: number | null = null;
+  private fallbackTabId: number | null = null;
+
+  async attach(tabId: number): Promise<void> {
+    if (this.attachedTabs.has(tabId)) {
+      this.currentTabId = tabId;
+      return;
+    }
+
+    try {
+      await chrome.debugger.detach({ tabId });
+    } catch {
+      // Tab may not be attached
+    }
+
+    await chrome.debugger.attach({ tabId }, "1.3");
+    this.attachedTabs.add(tabId);
+    this.currentTabId = tabId;
+  }
+
+  async detach(tabId: number): Promise<void> {
+    try {
+      await chrome.debugger.detach({ tabId });
+    } catch {
+      // Tab may already be detached
+    }
+    this.attachedTabs.delete(tabId);
+    if (this.currentTabId === tabId) {
+      this.currentTabId = null;
+    }
+  }
+
+  async send<T>(method: string, params?: Record<string, unknown>): Promise<T> {
+    const tabId = this.currentTabId;
+    if (tabId === null) {
+      throw new Error("No tab attached. Call attach(tabId) first.");
+    }
+    return (await chrome.debugger.sendCommand({ tabId }, method, params as Record<string, never>)) as T;
+  }
+
+  getCurrentTabId(): number | null {
+    return this.currentTabId;
+  }
+
+  setFallbackTab(tabId: number): void {
+    this.fallbackTabId = tabId;
+  }
+
+  async getActiveTab(): Promise<chrome.tabs.Tab> {
+    // Try current attached tab first
+    if (this.currentTabId !== null) {
+      try {
+        const tab = await chrome.tabs.get(this.currentTabId);
+        if (tab) return tab;
+      } catch {
+        this.attachedTabs.delete(this.currentTabId);
+        this.currentTabId = null;
+      }
+    }
+
+    // Try fallback tab
+    if (this.fallbackTabId !== null) {
+      try {
+        const tab = await chrome.tabs.get(this.fallbackTabId);
+        if (tab) return tab;
+      } catch {
+        this.fallbackTabId = null;
+      }
+    }
+
+    // Query active tab
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id) {
+      throw new Error("No active tab found");
+    }
+    this.fallbackTabId = tab.id;
+    return tab;
+  }
+}
