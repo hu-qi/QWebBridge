@@ -2,6 +2,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import { createServer as createHttpServer } from "http";
 import { DAEMON_PORT, WS_PATH } from "@qweb/protocol";
 import { SessionManager } from "./session.js";
+import { handleHttpRequest } from "./adapters/http.js";
 import { loadConfig } from "./config.js";
 import type { Message, CommandRequest } from "@qweb/protocol";
 
@@ -9,7 +10,17 @@ export function createServer(sessionManager: SessionManager, port?: number): Pro
   const config = loadConfig();
   const listenPort = port ?? config.port;
 
-  const httpServer = createHttpServer((_req, res) => {
+  const httpServer = createHttpServer((req, res) => {
+    if (handleHttpRequest(req, res, sessionManager)) return;
+
+    if (req.url === "/shutdown" && req.method === "POST") {
+      res.writeHead(200);
+      res.end("OK");
+      httpServer.close();
+      process.exit(0);
+      return;
+    }
+
     res.writeHead(404);
     res.end("404 page not found");
   });
