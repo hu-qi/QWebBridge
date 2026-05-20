@@ -45,6 +45,22 @@ async function main() {
       break;
     }
 
+    case "mcp": {
+      const { createServer } = await import("../server.js");
+      const { SessionManager } = await import("../session.js");
+      const { writePid } = await import("../config.js");
+      const sm = new SessionManager();
+      const { httpServer } = await createServer(sm);
+      writePid(process.pid);
+
+      const { createMCPAdapter } = await import("../adapters/mcp.js");
+      createMCPAdapter(sm);
+
+      process.on("SIGINT", () => { httpServer.close(); process.exit(0); });
+      process.on("SIGTERM", () => { httpServer.close(); process.exit(0); });
+      break;
+    }
+
     case "version":
     case "--version":
     case "-v": {
@@ -61,6 +77,7 @@ async function main() {
       console.log("  run        Start the daemon");
       console.log("  shutdown   Stop the daemon");
       console.log("  install    Show installation instructions");
+      console.log("  mcp        Start MCP server (for Claude Desktop, Cursor, etc.)");
       console.log("  version    Show version");
       break;
     }
