@@ -30,7 +30,7 @@ export async function groupTab(
   const title = groupTitle ?? `agent:${sessionName}`;
 
   const groupId = await chrome.tabs.group({ tabIds: ids });
-  await chrome.tabGroups.update(groupId, { title, color, collapsed: false });
+  await chrome.tabGroups.update(groupId, { title, color: color as chrome.tabGroups.ColorEnum, collapsed: false });
   sessionGroups.set(sessionName, groupId);
 }
 

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import type { WebSocket } from "ws";
 import { SessionManager } from "../session.js";
 
 describe("SessionManager", () => {
