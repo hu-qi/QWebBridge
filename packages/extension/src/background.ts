@@ -105,6 +105,13 @@ function scheduleReconnect(): void {
   reconnectTimer = setTimeout(connect, 2000);
 }
 
+// Handle popup status requests
+chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
+  if (request.type === "status") {
+    sendResponse({ connected: handshakeDone && ws !== null && ws.readyState === WebSocket.OPEN });
+  }
+});
+
 // Keep service worker alive
 chrome.alarms.create("keepalive", { periodInMinutes: 1 });
 chrome.alarms.onAlarm.addListener((alarm) => {

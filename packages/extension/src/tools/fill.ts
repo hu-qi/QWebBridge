@@ -29,11 +29,8 @@ function fillScript(targetExpr: string, value: string): string {
       }
       return { success: true, tag: __target.tagName, mode: 'contenteditable' };
     }
-    const __nativeSetter = Object.getOwnPropertyDescriptor(
-      window.HTMLInputElement.prototype, 'value'
-    )?.set || Object.getOwnPropertyDescriptor(
-      window.HTMLTextAreaElement.prototype, 'value'
-    )?.set;
+    const __proto = __target.tagName === 'TEXTAREA' ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype;
+    const __nativeSetter = Object.getOwnPropertyDescriptor(__proto, 'value')?.set;
     if (__nativeSetter) {
       __nativeSetter.call(__target, ${n});
     } else {
@@ -61,8 +58,10 @@ const fillTool: ToolExecutor = {
       const entry = ctx.refs.get(refName);
       if (!entry) throw new Error(`fill: unknown ref "${selector}"`);
 
+      const evalCtx = await ctx.cdp.send<{ executionContextId?: number }>("Runtime.evaluate", { expression: "1", returnByValue: true });
       const { object } = await ctx.cdp.send<{ object: { objectId: string } }>("DOM.resolveNode", {
         backendNodeId: entry.backendDOMNodeId,
+        executionContextId: evalCtx.executionContextId ?? 1,
       });
       if (!object?.objectId) throw new Error("fill: could not resolve ref");
 
