@@ -40,7 +40,7 @@ export function handleHttpRequest(
         const id = `http-${Date.now()}`;
         const commandMsg = {
           id,
-          type: "command",
+          type: "tool_call" as const,
           payload: { tool: toolName, params },
         };
 

@@ -32,7 +32,7 @@ describe("WebSocket Server", () => {
     ws.close();
   });
 
-  it("should respond to hello with connection confirmation", async () => {
+  it("should respond to hello with hello_ack", async () => {
     const ws = new WebSocket(WS_URL);
 
     await new Promise<void>((resolve) => {
@@ -46,22 +46,22 @@ describe("WebSocket Server", () => {
 
       ws.on("message", (data: Buffer) => {
         const msg = JSON.parse(data.toString());
-        expect(msg.type).toBe("response");
-        expect(msg.payload.result.status).toBe("connected");
+        expect(msg.type).toBe("hello_ack");
+        expect(msg.payload.status).toBe("connected");
         ws.close();
         resolve();
       });
     });
   });
 
-  it("should require hello before commands", async () => {
+  it("should require hello before tool calls", async () => {
     const ws = new WebSocket(WS_URL);
 
     await new Promise<void>((resolve) => {
       ws.on("open", () => {
         ws.send(JSON.stringify({
           id: "2",
-          type: "command",
+          type: "tool_call",
           payload: { tool: "navigate", params: { url: "https://example.com" } },
         }));
       });

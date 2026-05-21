@@ -21,7 +21,7 @@ describe("Daemon Integration", () => {
     httpServer.close();
   });
 
-  it("should complete hello -> command -> response flow with mock extension", async () => {
+  it("should complete hello -> tool_call -> tool_result flow with mock extension", async () => {
     // Connect as extension
     const extWs = new WebSocket(WS_URL);
     await new Promise<void>((resolve) => {
@@ -48,23 +48,23 @@ describe("Daemon Integration", () => {
       agentWs.on("message", () => resolve());
     });
 
-    // Extension should process commands sent by agent
+    // Extension should process tool calls sent by agent
     extWs.on("message", (data: Buffer) => {
       const msg = JSON.parse(data.toString());
-      if (msg.type === "command") {
+      if (msg.type === "tool_call") {
         extWs.send(JSON.stringify({
           id: msg.id,
-          type: "response",
+          type: "tool_result",
           payload: { result: { success: true, url: "https://example.com", tabId: 42 } },
         }));
       }
     });
 
-    // Agent sends command and receives response
+    // Agent sends tool_call and receives tool_result
     const response = await new Promise<{ type: string }>((resolve) => {
       agentWs.send(JSON.stringify({
         id: "cmd-1",
-        type: "command",
+        type: "tool_call",
         payload: { tool: "navigate", params: { url: "https://example.com" } },
       }));
       agentWs.on("message", (data: Buffer) => {
@@ -73,7 +73,7 @@ describe("Daemon Integration", () => {
       });
     });
 
-    expect(response.type).toBe("response");
+    expect(response.type).toBe("tool_result");
 
     agentWs.close();
     extWs.close();

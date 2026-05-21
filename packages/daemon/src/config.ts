@@ -2,7 +2,10 @@ import { homedir } from "os";
 import { join } from "path";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { randomBytes } from "crypto";
-import type { DeviceIdentity } from "@qweb/protocol";
+
+interface DeviceIdentity {
+  device_id: string;
+}
 
 const CONFIG_DIR = join(homedir(), ".qweb-bridge");
 const IDENTITY_FILE = join(CONFIG_DIR, "identity.json");

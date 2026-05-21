@@ -1,4 +1,4 @@
-import { registerTool, type ToolExecutor, type ToolContext } from "./index.js";
+import { registerTool, type ToolExecutor } from "./index.js";
 
 function fillScript(targetExpr: string, value: string): string {
   const n = JSON.stringify(value);

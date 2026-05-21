@@ -4,16 +4,16 @@ import { untrackTab, clearSessionGroup } from "../tab-manager.js";
 registerTool({
   name: "find_tab",
   async execute(params) {
-    const url = params.url as string;
-    if (!url) throw new Error("find_tab: url is required");
+    const url_contains = params.url_contains as string;
+    if (!url_contains) throw new Error("find_tab: url_contains is required");
 
     const allTabs = await chrome.tabs.query({});
     for (const tab of allTabs) {
-      if (tab.url?.includes(url)) {
+      if (tab.url?.includes(url_contains)) {
         return { tabId: tab.id!, url: tab.url, title: tab.title || "" };
       }
     }
-    throw new Error(`find_tab: no tab found matching "${url}"`);
+    throw new Error(`find_tab: no tab found matching "${url_contains}"`);
   },
 });
 

@@ -1,12 +1,6 @@
-// === Identity ===
-
-export interface DeviceIdentity {
-  device_id: string;
-}
-
 // === Message Envelope ===
 
-export type MessageType = "hello" | "command" | "response" | "error" | "event";
+export type MessageType = "hello" | "hello_ack" | "tool_call" | "tool_result" | "error" | "event";
 
 export interface Message<T = unknown> {
   id: string;
@@ -22,15 +16,15 @@ export interface HelloPayload {
   capabilities?: string[];
 }
 
-// === Command ===
+// === Tool Call ===
 
-export interface CommandRequest {
+export interface ToolCallPayload {
   tool: string;
   params: Record<string, unknown>;
   session?: string;
 }
 
-export interface CommandResponse<T = unknown> {
+export interface ToolResultPayload<T = unknown> {
   result: T;
 }
 
@@ -45,7 +39,16 @@ export interface ErrorDetail {
 // === Event (alive ping, etc.) ===
 
 export interface DaemonAliveEvent {
+  event: "webbridge_daemon_alive" | "webbridge_daemon_start";
   arch: string;
   daemon_version: string;
   os: string;
+}
+
+// === Handshake ===
+
+export interface HelloAckPayload {
+  status: string;
+  session_id?: string;
+  extensionVersion?: string;
 }

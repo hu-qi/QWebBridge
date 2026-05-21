@@ -128,7 +128,7 @@ export type NetworkResult = { success: boolean } | NetworkListResult | NetworkDe
 
 // === Tab management ===
 export interface FindTabParams {
-  url: string;
+  url_contains: string;
   _session?: string;
 }
 export interface TabInfo {

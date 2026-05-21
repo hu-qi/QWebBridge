@@ -29,6 +29,10 @@ export const ERROR_CODES = {
   EXTENSION_DISCONNECTED: "extension_disconnected",
   NO_EXTENSION_CONNECTED: "no_extension_connected",
   NAVIGATION_FAILED: "navigation_failed",
+  EXECUTION_ERROR: "execution_error",
+  PROTOCOL_ERROR: "protocol_error",
+  REQUEST_TIMEOUT: "request_timeout",
+  SAVE_PDF_FAILED: "save_pdf_failed",
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];

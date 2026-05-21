@@ -1,7 +1,8 @@
 import { CDPController } from "./cdp/controller.js";
 import { RefStore } from "./ref-store.js";
 import { getTool } from "./tools/index.js";
-import type { Message, CommandRequest } from "@qweb/protocol";
+import { ERROR_CODES } from "@qweb/protocol";
+import type { Message, ToolCallPayload } from "@qweb/protocol";
 
 import "./tools/navigate.js";
 import "./tools/snapshot.js";
@@ -45,22 +46,22 @@ function connect(): void {
       try {
         const msg: Message = JSON.parse(event.data as string);
 
-        if (msg.type === "response" && !handshakeDone) {
+        if (msg.type === "hello_ack" && !handshakeDone) {
           handshakeDone = true;
           console.log("[QwebBridge] Handshake complete");
           return;
         }
 
-        if (msg.type !== "command" || !handshakeDone) return;
+        if (msg.type !== "tool_call" || !handshakeDone) return;
 
-        const cmd = msg.payload as CommandRequest;
+        const cmd = msg.payload as ToolCallPayload;
         const tool = getTool(cmd.tool);
 
         if (!tool) {
           ws!.send(JSON.stringify({
             id: msg.id,
             type: "error",
-            payload: { code: "tool_not_found", message: `Unknown tool: ${cmd.tool}` },
+            payload: { code: ERROR_CODES.TOOL_NOT_FOUND, message: `Unknown tool: ${cmd.tool}` },
           }));
           return;
         }
@@ -69,7 +70,7 @@ function connect(): void {
           const result = await tool.execute(cmd.params, { cdp, refs });
           ws!.send(JSON.stringify({
             id: msg.id,
-            type: "response",
+            type: "tool_result",
             payload: { result },
           }));
         } catch (err) {
@@ -77,7 +78,7 @@ function connect(): void {
           ws!.send(JSON.stringify({
             id: msg.id,
             type: "error",
-            payload: { code: "execution_error", message },
+            payload: { code: ERROR_CODES.EXECUTION_ERROR, message },
           }));
         }
       } catch {

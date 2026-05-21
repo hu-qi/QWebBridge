@@ -84,7 +84,7 @@ export function createMCPAdapter(sessionManager: SessionManager): void {
 
             const msg = {
               id: `mcp-${req.id}`,
-              type: "command",
+              type: "tool_call" as const,
               payload: {
                 tool: toolName,
                 params: params.arguments ?? {},
