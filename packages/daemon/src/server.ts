@@ -39,12 +39,13 @@ export function createServer(sessionManager: SessionManager, port?: number): Pro
 
         if (!handshakeDone && msg.type === "hello") {
           handshakeDone = true;
-          const payload = msg.payload as { agent?: string; version?: string };
+          const payload = msg.payload as { agent?: string; version?: string; extension_id?: string };
           const agent = payload.agent || "";
 
           if (agent === "extension") {
             isExtension = true;
-            sessionManager.setExtension(ws, payload.version);
+            const extId = (payload as { extension_id?: string }).extension_id;
+            sessionManager.setExtension(ws, payload.version, extId);
             ws.send(JSON.stringify({
               id: msg.id,
               type: "hello_ack",

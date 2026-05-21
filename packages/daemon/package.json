@@ -9,6 +9,7 @@
   },
   "scripts": {
     "build": "tsup",
+    "build:binary": "node scripts/build-binary.js",
     "dev": "tsup --watch",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",

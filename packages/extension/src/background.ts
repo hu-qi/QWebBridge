@@ -38,7 +38,7 @@ function connect(): void {
       ws!.send(JSON.stringify({
         id: "extension-hello",
         type: "hello",
-        payload: { agent: "extension", version: "1.0.0" },
+        payload: { agent: "extension", version: "1.0.0", extension_id: chrome.runtime.id },
       }));
     };
 

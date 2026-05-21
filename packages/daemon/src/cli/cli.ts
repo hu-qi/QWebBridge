@@ -207,6 +207,7 @@ async function main() {
 
     case "install-skill": {
       const skillDir = join(homedir(), ".agents", "skills", "qweb-bridge");
+      const claudeSkillDir = join(homedir(), ".claude", "skills", "qweb-bridge");
       // Search in multiple locations
       const candidates = [
         join(process.cwd(), "packages", "skill", "qweb-bridge"),
@@ -217,14 +218,34 @@ async function main() {
       for (const c of candidates) {
         if (existsSync(join(c, "SKILL.md"))) { skillSource = c; break; }
       }
-      if (skillSource) {
+
+      let installed = false;
+
+      // OpenCode / Cursor / Copilot style
+      if (existsSync(join(homedir(), ".agents", "skills"))) {
         if (existsSync(skillDir)) rmSync(skillDir, { recursive: true });
         mkdirSync(join(homedir(), ".agents", "skills"), { recursive: true });
         cpSync(skillSource, skillDir, { recursive: true });
-        console.log("✓ Skill installed to " + skillDir);
-      } else {
-        console.log("! Skill source not found at " + skillSource);
-        console.log("  Run this command from the QwebBridge project root");
+        console.log("✓ Installed to ~/.agents/skills/qweb-bridge/");
+        installed = true;
+      }
+
+      // Claude Code style
+      if (existsSync(join(homedir(), ".claude", "skills"))) {
+        if (existsSync(claudeSkillDir)) rmSync(claudeSkillDir, { recursive: true });
+        mkdirSync(join(homedir(), ".claude", "skills"), { recursive: true });
+        cpSync(skillSource, claudeSkillDir, { recursive: true });
+        console.log("✓ Installed to ~/.claude/skills/qweb-bridge/");
+        installed = true;
+      }
+
+      if (!installed) {
+        // Fallback: install anyway
+        mkdirSync(join(homedir(), ".agents", "skills"), { recursive: true });
+        if (existsSync(skillDir)) rmSync(skillDir, { recursive: true });
+        cpSync(skillSource, skillDir, { recursive: true });
+        console.log("✓ Installed to ~/.agents/skills/qweb-bridge/");
+        console.log("  (no existing AI agent skill dir detected — created one)");
       }
       process.exit(0);
     }
@@ -260,6 +281,48 @@ async function main() {
         console.log("[qweb-bridge] Shutdown signal sent");
       } catch {
         console.log("[qweb-bridge] Daemon is not running");
+      }
+      process.exit(0);
+    }
+
+    case "completion": {
+      const shell = process.argv[3] || "bash";
+      if (shell === "bash") {
+        console.log(`_qweb_bridge_completions() {
+  local cur=\${COMP_WORDS[COMP_CWORD]}
+  COMPREPLY=(\$(compgen -W "start stop restart status run shutdown logs install install-skill uninstall upgrade mcp version" -- "\$cur"))
+}
+complete -F _qweb_bridge_completions qweb-bridge`);
+      } else if (shell === "zsh") {
+        console.log(`#compdef qweb-bridge
+_arguments "1: :(start stop restart status run shutdown logs install install-skill uninstall upgrade mcp version)"`);
+      } else {
+        console.log("Unsupported shell: " + shell + " (supported: bash, zsh)");
+      }
+      process.exit(0);
+    }
+
+    case "upgrade": {
+      console.log("[qweb-bridge] Checking for updates...");
+      try {
+        const res = await fetch("https://api.github.com/repos/hu-qi/QWebBridge/releases/latest", {
+          headers: { "Accept": "application/vnd.github.v3+json", "User-Agent": "qweb-bridge" },
+        });
+        const data = await res.json() as { tag_name?: string; html_url?: string };
+        const latest = data.tag_name || "";
+        const cleaned = latest.replace(/^v/, "");
+        if (cleaned && cleaned > VERSION) {
+          console.log("  Current: v" + VERSION);
+          console.log("  Latest:  " + latest);
+          console.log("");
+          console.log("  Update available: " + (data.html_url || ""));
+          console.log("  Run: git pull && pnpm install && pnpm build");
+        } else if (cleaned) {
+          console.log("  You're up to date (v" + VERSION + ")");
+        }
+      } catch {
+        console.log("  Could not check for updates (no internet?)");
+        console.log("  Current version: v" + VERSION);
       }
       process.exit(0);
     }
@@ -312,6 +375,8 @@ async function main() {
       console.log("  install        Show installation instructions");
       console.log("  install-skill  Install the qweb-bridge skill");
       console.log("  uninstall      Stop daemon and remove all data");
+      console.log("  upgrade        Check for newer version");
+      console.log("  completion     Generate shell completion (bash|zsh)");
       console.log("  mcp            Start MCP server");
       console.log("  version        Show version");
       break;
