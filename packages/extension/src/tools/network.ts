@@ -1,4 +1,4 @@
-import { registerTool, type ToolExecutor } from "./index.js";
+import { registerTool, getTabId, type ToolExecutor } from "./index.js";
 
 interface StoredRequest {
   requestId: string;
@@ -21,8 +21,7 @@ const cdpNetwork: ToolExecutor = {
     const cmd = params.cmd as string;
     if (!cmd) throw new Error("network: cmd is required");
 
-    const tab = await ctx.cdp.getActiveTab();
-    await ctx.cdp.attach(tab.id!);
+    await ctx.cdp.attach(await getTabId(params, ctx));
 
     switch (cmd) {
       case "start": {

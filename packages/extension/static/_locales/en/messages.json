@@ -1,0 +1,82 @@
+{
+  "description": {
+    "message": "QWebBridge — browser extension for AI agents. AI can open pages, click, fill forms, extract info."
+  },
+  "readyMessage": {
+    "message": "Browser assistant is ready"
+  },
+  "notReadyMessage": {
+    "message": "Browser assistant is not ready"
+  },
+  "setupGuideButton": {
+    "message": "View setup guide"
+  },
+  "userGuideLink": {
+    "message": "User guide"
+  },
+  "devAdvancedSettings": {
+    "message": "Advanced Settings"
+  },
+  "devClickHint": {
+    "message": "$N$ more clicks to enable advanced options",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "devExit": {
+    "message": "Exit Developer Mode"
+  },
+  "devReset": {
+    "message": "Reset to default"
+  },
+  "devSave": {
+    "message": "Save"
+  },
+  "devSaved": {
+    "message": "Saved — reconnecting…"
+  },
+  "devServerUrlLabel": {
+    "message": "Daemon WebSocket URL"
+  },
+  "devTest": {
+    "message": "Test"
+  },
+  "devTestFailed": {
+    "message": "Connection failed — check address, network, and that the daemon is running"
+  },
+  "devTestOk": {
+    "message": "Connection OK"
+  },
+  "devTesting": {
+    "message": "Testing…"
+  },
+  "devTrustCancel": {
+    "message": "Cancel"
+  },
+  "devTrustConfirm": {
+    "message": "I trust this — connect"
+  },
+  "devTrustWarningBody": {
+    "message": "It can click, type, read page contents, and operate tabs. Only continue if you fully trust this server."
+  },
+  "devTrustWarningInsecure": {
+    "message": "⚠ Connection is unencrypted (ws://) — anyone on the same network can monitor or tamper with traffic."
+  },
+  "devTrustWarningTitle": {
+    "message": "This server will gain control of your browser"
+  },
+  "devUrlEmpty": {
+    "message": "URL cannot be empty"
+  },
+  "devUrlInvalid": {
+    "message": "Invalid URL format"
+  },
+  "devUrlWrongProtocol": {
+    "message": "URL must start with ws:// or wss://"
+  },
+  "docsLinkUrl": {
+    "message": "https://github.com/hu-qi/QWebBridge"
+  }
+}

@@ -6,6 +6,13 @@ export interface ToolContext {
   refs: RefStore;
 }
 
+export async function getTabId(params: Record<string, unknown>, ctx: ToolContext): Promise<number> {
+  const tabId = params._tabId as number | undefined;
+  if (tabId !== undefined) return tabId;
+  const tab = await ctx.cdp.getActiveTab();
+  return tab.id!;
+}
+
 export interface ToolExecutor {
   name: string;
   execute(params: Record<string, unknown>, ctx: ToolContext): Promise<unknown>;

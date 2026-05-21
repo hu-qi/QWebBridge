@@ -1,4 +1,4 @@
-import { registerTool, type ToolExecutor } from "./index.js";
+import { registerTool, getTabId, type ToolExecutor } from "./index.js";
 import type { SnapshotElement } from "@qweb/protocol";
 
 interface AXNode {
@@ -17,8 +17,7 @@ interface GetFullAXTreeResult {
 export const snapshotTool: ToolExecutor = {
   name: "snapshot",
   async execute(_params, ctx) {
-    const tab = await ctx.cdp.getActiveTab();
-    await ctx.cdp.attach(tab.id!);
+    await ctx.cdp.attach(await getTabId(_params, ctx));
 
     const result = await ctx.cdp.send<GetFullAXTreeResult>(
       "Accessibility.getFullAXTree"

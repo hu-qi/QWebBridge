@@ -1,4 +1,4 @@
-import { registerTool, type ToolExecutor } from "./index.js";
+import { registerTool, getTabId, type ToolExecutor } from "./index.js";
 
 const evaluateTool: ToolExecutor = {
   name: "evaluate",
@@ -6,8 +6,7 @@ const evaluateTool: ToolExecutor = {
     const code = params.code as string;
     if (!code) throw new Error("evaluate: code is required");
 
-    const tab = await ctx.cdp.getActiveTab();
-    await ctx.cdp.attach(tab.id!);
+    await ctx.cdp.attach(await getTabId(params, ctx));
 
     const result = await ctx.cdp.send<{ result: { value: unknown }; exceptionDetails?: { text: string } }>(
       "Runtime.evaluate",

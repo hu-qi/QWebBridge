@@ -1,4 +1,4 @@
-import { registerTool, type ToolExecutor } from "./index.js";
+import { registerTool, getTabId, type ToolExecutor } from "./index.js";
 
 function fillScript(targetExpr: string, value: string): string {
   const n = JSON.stringify(value);
@@ -50,8 +50,7 @@ const fillTool: ToolExecutor = {
     if (!selector) throw new Error("fill: selector is required");
     if (value == null) throw new Error("fill: value is required");
 
-    const tab = await ctx.cdp.getActiveTab();
-    await ctx.cdp.attach(tab.id!);
+    await ctx.cdp.attach(await getTabId(params, ctx));
 
     if (ctx.refs.isRef(selector)) {
       const refName = selector.startsWith("@") ? selector.slice(1) : selector;

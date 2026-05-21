@@ -21,11 +21,20 @@ import "./tools/save-as-pdf.js";
 const cdp = new CDPController();
 const refs = new RefStore();
 const DAEMON_PORT = 10086;
-const WS_URL = `ws://127.0.0.1:${DAEMON_PORT}/selector/command`;
+let WS_URL = `ws://127.0.0.1:${DAEMON_PORT}/selector/command`;
+
+
 
 let ws: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let handshakeDone = false;
+
+// Support custom daemon URL from storage (set via popup dev settings)
+try {
+  chrome.storage.local.get("daemonUrl", (result) => {
+    if (result.daemonUrl) WS_URL = result.daemonUrl;
+  });
+} catch {}
 
 function connect(): void {
   if (ws && ws.readyState === WebSocket.OPEN) return;
@@ -40,6 +49,7 @@ function connect(): void {
         type: "hello",
         payload: { agent: "extension", version: "1.0.0", extension_id: chrome.runtime.id },
       }));
+      notifyPopup(true);
     };
 
     ws.onmessage = async (event: MessageEvent) => {
@@ -89,6 +99,7 @@ function connect(): void {
     ws.onclose = () => {
       console.log("[QwebBridge] Disconnected from daemon, reconnecting...");
       handshakeDone = false;
+      notifyPopup(false);
       scheduleReconnect();
     };
 
@@ -110,7 +121,18 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
   if (request.type === "status") {
     sendResponse({ connected: handshakeDone && ws !== null && ws.readyState === WebSocket.OPEN });
   }
+  if (request.type === "SET_DAEMON_URL" && request.url) {
+    WS_URL = request.url;
+    chrome.storage.local.set({ daemonUrl: request.url }).catch(() => {});
+    if (ws) { ws.close(); }
+    connect();
+  }
+  return true; // Keep message channel open for async response
 });
+
+function notifyPopup(connected: boolean): void {
+  chrome.runtime.sendMessage({ type: "CONNECTION_STATUS", connected }).catch(() => {});
+}
 
 // Keep service worker alive
 chrome.alarms.create("keepalive", { periodInMinutes: 1 });

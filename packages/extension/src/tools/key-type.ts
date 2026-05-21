@@ -1,4 +1,4 @@
-import { registerTool } from "./index.js";
+import { registerTool, getTabId } from "./index.js";
 
 registerTool({
   name: "key_type",
@@ -6,8 +6,7 @@ registerTool({
     const text = params.text as string;
     if (typeof text !== "string") throw new Error("key_type: text is required");
 
-    const tab = await ctx.cdp.getActiveTab();
-    await ctx.cdp.attach(tab.id!);
+    await ctx.cdp.attach(await getTabId(params, ctx));
 
     for (const char of text) {
       await ctx.cdp.send("Input.dispatchKeyEvent", {

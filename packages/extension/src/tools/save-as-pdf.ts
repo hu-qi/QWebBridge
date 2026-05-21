@@ -1,10 +1,9 @@
-import { registerTool, type ToolExecutor } from "./index.js";
+import { registerTool, getTabId, type ToolExecutor } from "./index.js";
 
 const saveAsPdfTool: ToolExecutor = {
   name: "save_as_pdf",
   async execute(params, ctx) {
-    const tab = await ctx.cdp.getActiveTab();
-    await ctx.cdp.attach(tab.id!);
+    await ctx.cdp.attach(await getTabId(params, ctx));
 
     const result = await ctx.cdp.send<{ data: string }>("Page.printToPDF", {
       printBackground: true,

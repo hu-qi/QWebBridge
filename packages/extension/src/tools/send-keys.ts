@@ -1,4 +1,4 @@
-import { registerTool } from "./index.js";
+import { registerTool, getTabId } from "./index.js";
 
 const KEY_MAP: Record<string, { code: string; key: string; text?: string }> = {
   Enter: { code: "Enter", key: "Enter", text: "\r" },
@@ -23,8 +23,7 @@ registerTool({
     const keys = params.keys as string;
     if (typeof keys !== "string" || !keys.trim()) throw new Error("send_keys: keys is required");
 
-    const tab = await ctx.cdp.getActiveTab();
-    await ctx.cdp.attach(tab.id!);
+    await ctx.cdp.attach(await getTabId(params, ctx));
 
     const parts = keys.split("+");
     const keyName = parts[parts.length - 1];
