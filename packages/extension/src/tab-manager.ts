@@ -27,7 +27,7 @@ export async function groupTab(
   }
 
   const color = TAB_GROUP_COLORS[sessionName] ?? FALLBACK_COLORS[colorIndex++ % FALLBACK_COLORS.length];
-  const title = groupTitle ?? `agent:${sessionName}`;
+  const title = groupTitle ?? sessionName;
 
   const groupId = await chrome.tabs.group({ tabIds: ids });
   await chrome.tabGroups.update(groupId, { title, color: color as chrome.tabGroups.ColorEnum, collapsed: false });
