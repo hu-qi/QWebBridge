@@ -7,6 +7,16 @@ registerTool({
     const url_contains = params.url_contains as string;
     if (!url_contains) throw new Error("find_tab: url_contains is required");
 
+    const active = params.active as boolean | undefined;
+
+    if (active) {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tab?.url?.includes(url_contains)) {
+        return { tabId: tab.id!, url: tab.url, title: tab.title || "" };
+      }
+      throw new Error(`find_tab: active tab does not match "${url_contains}"`);
+    }
+
     const allTabs = await chrome.tabs.query({});
     for (const tab of allTabs) {
       if (tab.url?.includes(url_contains)) {
