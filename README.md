@@ -57,6 +57,21 @@ node packages/daemon/dist/cli.js run
 - **HTTP REST**: `POST /api/tool/<name>`
 - **CLI**: `qweb-bridge navigate --url https://example.com`
 
+## AI Agent Skill
+
+QwebBridge ships with an agent skill for AI-assisted development environments:
+
+```bash
+bash packages/skill/install.sh
+```
+
+This installs the skill to `~/.agents/skills/qweb-bridge/`, making it auto-discoverable by AI agents. The skill provides:
+
+- Full 16-tool reference with params, return values, and call examples
+- Session management and tab group conventions
+- Screenshot helper script (avoids base64 context flooding)
+- Operations guide for install, start, and troubleshooting
+
 ## License
 
 MIT
