@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build a TypeScript monorepo that fully clones Kimi WebBridge — a browser extension + local daemon that lets AI agents control Chrome via CDP.
+**Goal:** Build a TypeScript monorepo for a browser extension + local daemon that lets AI agents control Chrome via CDP.
 
 **Architecture:** Three packages in a pnpm monorepo: `protocol` (shared types), `daemon` (Node.js WebSocket server on localhost:10086), `extension` (Chrome MV3 extension with 16 CDP tools). Agent ↔ Daemon ↔ Extension ↔ Browser.
 
@@ -3809,7 +3809,7 @@ node packages/daemon/dist/cli.js run
 
 ## Agent Integration
 
-- **WebSocket**: Connect to `ws://localhost:10086/selector/command` (Kimi WebBridge compatible)
+- **WebSocket**: Connect to `ws://localhost:10086/selector/command`
 - **MCP**: Run `qweb-bridge mcp` for Claude Desktop / Cursor
 - **HTTP REST**: `POST /api/tool/<name>`
 - **CLI**: `qweb-bridge navigate --url https://example.com`

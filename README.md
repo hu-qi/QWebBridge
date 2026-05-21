@@ -73,7 +73,7 @@ qweb-bridge uninstall       # Remove all data
 
 ## Agent Integration
 
-- **WebSocket**: Connect to `ws://localhost:10086/selector/command` (Kimi WebBridge compatible)
+- **WebSocket**: Connect to `ws://localhost:10086/selector/command`
 - **MCP**: Run `qweb-bridge mcp` for Claude Desktop / Cursor
 - **HTTP REST**: `POST /api/tool/<name>`
 - **CLI**: `qweb-bridge navigate --url https://example.com`

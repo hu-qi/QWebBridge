@@ -2,7 +2,7 @@
 
 > **Date**: 2026-05-20  
 > **Status**: Draft  
-> **Goal**: 完全复刻 Kimi WebBridge，TypeScript 全栈实现，协议兼容  
+> **Goal**: TypeScript 全栈实现的浏览器桥接工具，协议兼容  
 
 ## 1. Overview
 
@@ -43,7 +43,7 @@ QwebBridge/
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│  AI Agent (Claude Code / Kimi Code / Cursor / ...)       │
+│  AI Agent (Claude Code / Cursor / ...)       │
 │  → Initiates tool call (HTTP / CLI / MCP)                │
 └──────────────────────┬───────────────────────────────────┘
                        │ WebSocket JSON
@@ -112,7 +112,7 @@ interface Message {
 
 // Agent handshake on connect
 interface HelloPayload {
-  agent?: string;         // e.g. "claude-code", "kimi-code", "cursor"
+  agent?: string;         // e.g. "claude-code", "cursor"
   version?: string;
   capabilities?: string[];
 }
@@ -173,7 +173,7 @@ packages/daemon/
 │   │   └── decoder.ts     # JSON → Message
 │   ├── adapters/          # Multi-agent integration adapters
 │   │   ├── index.ts       # Adapter registry & startup selection
-│   │   ├── websocket.ts   # Native WebSocket (Kimi compatible)
+│   │   ├── websocket.ts   # Native WebSocket
 │   │   ├── mcp.ts         # MCP server (stdio/SSE)
 │   │   ├── http.ts        # HTTP REST API
 │   │   └── cli.ts         # CLI commands
@@ -208,7 +208,7 @@ packages/daemon/
 
 | Adapter | Protocol | Address | Target Agent |
 |---------|----------|---------|--------------|
-| WebSocket | wsjson | `ws://localhost:10086/selector/command` | Kimi Code, Claude Code (skill), custom agents |
+| WebSocket | wsjson | `ws://localhost:10086/selector/command` | Claude Code (skill), custom agents |
 | MCP | stdio | `qweb-bridge mcp` | Claude Desktop, Cursor, Codex |
 | HTTP REST | JSON | `http://localhost:10086/api/tool/:name` | Scripts, Python agents |
 | CLI | Shell | `qweb-bridge <tool> [params]` | Shell scripts, manual testing |
