@@ -21,6 +21,7 @@ export class SessionManager {
   private agentSessions = new Map<string, AgentSession>();
   private extensionConnection: WebSocket | null = null;
   private extensionVersion: string | null = null;
+  private extensionId: string | null = null;
   private pendingRequests = new Map<string, PendingRequest>();
   private tabSessions = new Map<string, number[]>();
 
@@ -38,9 +39,10 @@ export class SessionManager {
     return this.agentSessions.get(id);
   }
 
-  setExtension(ws: WebSocket, version?: string): void {
+  setExtension(ws: WebSocket, version?: string, extensionId?: string): void {
     this.extensionConnection = ws;
     this.extensionVersion = version || null;
+    this.extensionId = extensionId || null;
 
     ws.on("message", (data: Buffer) => {
       try {
@@ -63,6 +65,7 @@ export class SessionManager {
     ws.on("close", () => {
       this.extensionConnection = null;
       this.extensionVersion = null;
+      this.extensionId = null;
       for (const [id, pending] of this.pendingRequests) {
         clearTimeout(pending.timer);
         pending.reject(new Error(ERROR_CODES.EXTENSION_DISCONNECTED));
@@ -73,6 +76,14 @@ export class SessionManager {
 
   hasExtension(): boolean {
     return this.extensionConnection !== null;
+  }
+
+  getExtensionVersion(): string | null {
+    return this.extensionVersion;
+  }
+
+  getExtensionId(): string | null {
+    return this.extensionId;
   }
 
   async sendToExtension(message: unknown): Promise<unknown> {
@@ -125,10 +136,6 @@ export class SessionManager {
       all.push(...tabs);
     }
     return all;
-  }
-
-  getExtensionVersion(): string | null {
-    return this.extensionVersion;
   }
 
   getAgentCount(): number {

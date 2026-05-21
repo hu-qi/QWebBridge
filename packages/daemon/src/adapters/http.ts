@@ -27,6 +27,7 @@ export function handleHttpRequest(
       uptime_seconds: uptime,
       extensions_connected: sessionManager.hasExtension(),
       extension_version: sessionManager.getExtensionVersion(),
+      extension_id: sessionManager.getExtensionId() || "",
     }));
     return true;
   }
