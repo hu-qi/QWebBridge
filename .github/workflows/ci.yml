@@ -32,11 +32,11 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      - name: Build protocol (needed for typecheck)
+        run: pnpm --filter @qweb/protocol build
+
       - name: Typecheck
         run: pnpm typecheck
 
       - name: Test
         run: pnpm test
-
-      - name: Build
-        run: pnpm build
