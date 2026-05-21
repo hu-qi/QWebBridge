@@ -13,9 +13,8 @@ const navigateTool: ToolExecutor = {
 
     if (newTab) {
       const tab = await chrome.tabs.create({ url, active: true });
-      if (session) {
-        await groupTab(tab.id!, session, groupTitle);
-      }
+      const agentSession = session || "agent";
+      await groupTab(tab.id!, agentSession, groupTitle);
       await ctx.cdp.attach(tab.id!);
       trackTab(tab.id!);
       await waitForLoad(tab.id!);
