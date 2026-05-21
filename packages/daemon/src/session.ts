@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import type { WebSocket } from "ws";
+import { ERROR_CODES } from "@qweb/protocol";
 
 interface AgentSession {
   id: string;
@@ -61,7 +62,7 @@ export class SessionManager {
       this.extensionConnection = null;
       for (const [id, pending] of this.pendingRequests) {
         clearTimeout(pending.timer);
-        pending.reject(new Error("extension_disconnected"));
+        pending.reject(new Error(ERROR_CODES.EXTENSION_DISCONNECTED));
         this.pendingRequests.delete(id);
       }
     });
@@ -73,7 +74,7 @@ export class SessionManager {
 
   async sendToExtension(message: unknown): Promise<unknown> {
     if (!this.extensionConnection) {
-      throw new Error("no_extension_connected");
+      throw new Error(ERROR_CODES.NO_EXTENSION_CONNECTED);
     }
 
     const msg = message as { id: string };
@@ -82,7 +83,7 @@ export class SessionManager {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pendingRequests.delete(id);
-        reject(new Error("request_timeout"));
+        reject(new Error(ERROR_CODES.REQUEST_TIMEOUT));
       }, REQUEST_TIMEOUT_MS);
 
       this.pendingRequests.set(id, { resolve, reject, timer });

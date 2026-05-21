@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { TOOL_NAMES, ERROR_CODES, DAEMON_PORT, WS_PATH } from "../constants.js";
-import type { Message, CommandRequest, CommandResponse, ErrorDetail, HelloPayload } from "../types.js";
+import type { Message, ToolCallPayload, ToolResultPayload, ErrorDetail, HelloPayload, HelloAckPayload } from "../types.js";
 
 describe("Constants", () => {
   it("should have exactly 16 tool names", () => {
@@ -27,7 +27,7 @@ describe("Constants", () => {
   });
 
   it("should define all error codes", () => {
-    expect(Object.keys(ERROR_CODES)).toHaveLength(9);
+    expect(Object.keys(ERROR_CODES)).toHaveLength(13);
   });
 
   it("should use correct port", () => {
@@ -52,10 +52,10 @@ describe("Message serialization round-trip", () => {
     expect(parsed.payload.agent).toBe("claude-code");
   });
 
-  it("should serialize and deserialize Command message", () => {
-    const msg: Message<CommandRequest> = {
+  it("should serialize and deserialize ToolCall message", () => {
+    const msg: Message<ToolCallPayload> = {
       id: "2",
-      type: "command",
+      type: "tool_call",
       payload: {
         tool: "navigate",
         params: { url: "https://example.com" },
@@ -63,21 +63,33 @@ describe("Message serialization round-trip", () => {
       },
     };
     const json = JSON.stringify(msg);
-    const parsed = JSON.parse(json) as Message<CommandRequest>;
-    expect(parsed.type).toBe("command");
+    const parsed = JSON.parse(json) as Message<ToolCallPayload>;
+    expect(parsed.type).toBe("tool_call");
     expect(parsed.payload.tool).toBe("navigate");
     expect(parsed.payload.session).toBe("test-session");
   });
 
-  it("should serialize and deserialize Response message", () => {
-    const msg: Message<CommandResponse> = {
+  it("should serialize and deserialize ToolResult message", () => {
+    const msg: Message<ToolResultPayload> = {
       id: "2",
-      type: "response",
+      type: "tool_result",
       payload: { result: { success: true, url: "https://example.com", tabId: 42 } },
     };
     const json = JSON.stringify(msg);
-    const parsed = JSON.parse(json) as Message<CommandResponse>;
-    expect(parsed.type).toBe("response");
+    const parsed = JSON.parse(json) as Message<ToolResultPayload>;
+    expect(parsed.type).toBe("tool_result");
+  });
+
+  it("should serialize and deserialize HelloAck message", () => {
+    const msg: Message<HelloAckPayload> = {
+      id: "1",
+      type: "hello_ack",
+      payload: { status: "connected", session_id: "abc-123" },
+    };
+    const json = JSON.stringify(msg);
+    const parsed = JSON.parse(json) as Message<HelloAckPayload>;
+    expect(parsed.type).toBe("hello_ack");
+    expect(parsed.payload.status).toBe("connected");
   });
 
   it("should serialize and deserialize Error message", () => {

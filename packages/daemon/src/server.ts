@@ -1,10 +1,10 @@
 import { WebSocketServer, WebSocket } from "ws";
 import { createServer as createHttpServer } from "http";
-import { DAEMON_PORT, WS_PATH } from "@qweb/protocol";
+import { WS_PATH, ERROR_CODES } from "@qweb/protocol";
 import { SessionManager } from "./session.js";
 import { handleHttpRequest } from "./adapters/http.js";
 import { loadConfig } from "./config.js";
-import type { Message, CommandRequest } from "@qweb/protocol";
+import type { Message } from "@qweb/protocol";
 
 export function createServer(sessionManager: SessionManager, port?: number): Promise<{ httpServer: ReturnType<typeof createHttpServer> }> {
   const config = loadConfig();
@@ -27,7 +27,7 @@ export function createServer(sessionManager: SessionManager, port?: number): Pro
 
   const wss = new WebSocketServer({ server: httpServer, path: `/${WS_PATH}` });
 
-  wss.on("connection", (ws: WebSocket, req) => {
+  wss.on("connection", (ws: WebSocket) => {
     let isExtension = false;
     let agentId: string | null = null;
     let handshakeDone = false;
@@ -38,18 +38,26 @@ export function createServer(sessionManager: SessionManager, port?: number): Pro
 
         if (!handshakeDone && msg.type === "hello") {
           handshakeDone = true;
-          const payload = msg.payload as { agent?: string };
+          const payload = msg.payload as { agent?: string; version?: string };
           const agent = payload.agent || "";
 
           if (agent === "extension") {
             isExtension = true;
             sessionManager.setExtension(ws);
-            ws.send(JSON.stringify({ id: msg.id, type: "response", payload: { result: { status: "connected" } } }));
+            ws.send(JSON.stringify({
+              id: msg.id,
+              type: "hello_ack",
+              payload: { status: "connected", extensionVersion: payload.version || "1.0.0" },
+            }));
             return;
           }
 
           agentId = sessionManager.addAgent(ws, agent);
-          ws.send(JSON.stringify({ id: msg.id, type: "response", payload: { result: { status: "connected", session_id: agentId } } }));
+          ws.send(JSON.stringify({
+            id: msg.id,
+            type: "hello_ack",
+            payload: { status: "connected", session_id: agentId },
+          }));
           return;
         }
 
@@ -57,18 +65,17 @@ export function createServer(sessionManager: SessionManager, port?: number): Pro
           ws.send(JSON.stringify({
             id: msg.id || "unknown",
             type: "error",
-            payload: { code: "protocol_error", message: "Hello message required before commands" },
+            payload: { code: ERROR_CODES.PROTOCOL_ERROR, message: "Hello message required before tool calls" },
           }));
           return;
         }
 
-        if (msg.type === "command" && !isExtension) {
-          const cmd = msg.payload as CommandRequest;
+        if (msg.type === "tool_call" && !isExtension) {
           sessionManager.sendToExtension(msg)
             .then((result) => {
               ws.send(JSON.stringify({
                 id: msg.id,
-                type: "response",
+                type: "tool_result",
                 payload: { result },
               }));
             })
@@ -110,5 +117,3 @@ export function createServer(sessionManager: SessionManager, port?: number): Pro
     });
   });
 }
-
-export { DAEMON_PORT, WS_PATH };

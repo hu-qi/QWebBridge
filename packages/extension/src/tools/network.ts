@@ -13,7 +13,7 @@ interface StoredRequest {
 }
 
 const requests = new Map<string, StoredRequest>();
-let networkHandler: ((source: chrome.debugger.Debuggee, method: string, params?: Object) => void) | null = null;
+let networkHandler: ((source: chrome.debugger.Debuggee, method: string, params?: object) => void) | null = null;
 
 const cdpNetwork: ToolExecutor = {
   name: "network",
@@ -32,7 +32,7 @@ const cdpNetwork: ToolExecutor = {
         networkHandler = (
           source: chrome.debugger.Debuggee,
           method: string,
-          params?: Object
+          params?: object
         ) => {
           if (source.tabId !== ctx.cdp.getCurrentTabId()) return;
 
