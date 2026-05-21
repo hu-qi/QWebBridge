@@ -7,16 +7,35 @@ description: Use when controlling the user's real browser — navigate, click, t
 
 Browser bridge for AI agents. Controls Chrome via a local daemon at `http://127.0.0.1:10086` + Chrome extension.
 
+## CLI
+
+```bash
+qweb-bridge status          # Show daemon status (JSON)
+qweb-bridge start           # Start daemon (background)
+qweb-bridge stop            # Stop daemon
+qweb-bridge restart         # Restart daemon
+qweb-bridge logs -n 100     # Show recent logs
+qweb-bridge logs -f         # Follow logs live
+qweb-bridge logs --prev     # View previous run's logs
+qweb-bridge install-skill   # Install skill to AI agent runtimes
+qweb-bridge uninstall       # Stop daemon + remove all data
+qweb-bridge run             # Start daemon (foreground)
+qweb-bridge mcp             # MCP mode (Claude Desktop/Cursor)
+```
+
 ## Health check (always do this first)
 
 ```bash
+qweb-bridge status
+# or
 curl -s http://127.0.0.1:10086/health
 ```
 
 Then act on the result:
 
-- **`{"extensions_connected": true}`** — healthy. Proceed with the tool calls below.
-- **Connection refused** or `extensions_connected: false` — daemon not running or extension not connected. Read `references/operations.md`.
+- **`{"running": true, "extensions_connected": true}`** — healthy. Proceed with the tool calls below.
+- **Connection refused** or `running: false` — daemon not running.
+- **`extensions_connected: false`** — extension not connected. Read `references/operations.md`.
 
 ## Tools
 
@@ -34,7 +53,7 @@ Response: `{ "success": true, "result": { ... } }`
 | Tool | Params | Returns | Note |
 |------|--------|---------|------|
 | `navigate` | `url`, `newTab`(bool), `group_title`, `_session` | `{success, url, tabId}` | Always use `newTab:true` on first call. `_session` controls tab group color isolation |
-| `find_tab` | `url_contains`, `_tabId` | `{tabId, url, title}` | **Reuse an open tab.** `url_contains` matches domain substring |
+| `find_tab` | `url_contains`, `active`(bool), `_tabId` | `{tabId, url, title}` | **Reuse an open tab.** `url_contains` matches domain substring. `active:true` picks the user's current tab |
 | `snapshot` | — | `{url, title, tree}` with `@e` refs | **Accessibility tree** — use this to read page content and locate elements |
 | `click` | `selector` (@e ref or CSS) | `{success, tag, text}` | Synthetic `el.click()`. Use `@eN` refs from snapshot when possible |
 | `mouse_click` | `selector` (@e ref or CSS) | `{success, x, y, tag, text}` | Dispatches JS `MouseEvent` at element center. Works on `<a>` links. |
@@ -56,9 +75,15 @@ Response: `{ "success": true, "result": { ... } }`
 Use `find_tab` when the user asks to operate on an already-open tab:
 
 ```bash
+# Find leftmost matching tab
 curl -s http://127.0.0.1:10086/api/tool/find_tab \
   -H 'Content-Type: application/json' \
   -d '{"url_contains":"example.com"}'
+
+# Find user's active tab (use when user says "在我当前的页面上")
+curl -s http://127.0.0.1:10086/api/tool/find_tab \
+  -H 'Content-Type: application/json' \
+  -d '{"url_contains":"example.com","active":true}'
 ```
 
 If it returns an error ("no tab found"), the page is not open — fall back to `navigate` with `newTab:true`.
@@ -78,9 +103,12 @@ Without `_session`, tabs are grouped under "agent".
 ### Call examples
 
 ```bash
+# status
+qweb-bridge status
+
 # navigate
-curl -s -X POST http://127.0.0.1:10086/api/tool/navigate \
-  -H 'Content-Type: application/json' \
+curl -s -X POST http://127.0.0.1:10086/api/tool/navigate
+  -H 'Content-Type: application/json'
   -d '{"url":"https://example.com","newTab":true}'
 
 # click by CSS selector

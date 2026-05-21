@@ -10,6 +10,14 @@ AI Agent → Daemon (Node.js, localhost:10086) → Chrome Extension (CDP) → Br
 
 ## Quick Start
 
+### Install (recommended)
+
+```bash
+curl -fsSL https://github.com/hu-qi/QWebBridge/raw/main/install.sh | bash
+```
+
+### Manual
+
 ```bash
 # 1. Install deps and build
 pnpm install
@@ -27,6 +35,19 @@ node packages/daemon/dist/cli.js run
 # 4. Connect an AI agent
 #    WebSocket: ws://localhost:10086/selector/command
 #    HTTP POST: curl -X POST http://localhost:10086/api/tool/navigate -H 'Content-Type: application/json' -d '{"url":"https://example.com"}'
+```
+
+### CLI
+
+```bash
+qweb-bridge status          # Show daemon status
+qweb-bridge start           # Start daemon (background)
+qweb-bridge stop            # Stop daemon
+qweb-bridge restart         # Restart daemon
+qweb-bridge logs -n 100     # View logs
+qweb-bridge logs -f         # Follow logs
+qweb-bridge install-skill   # Install AI agent skill
+qweb-bridge uninstall       # Remove all data
 ```
 
 ## Tools

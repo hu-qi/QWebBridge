@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "http";
 import type { SessionManager } from "../session.js";
-import { TOOL_NAMES } from "@qweb/protocol";
+import { TOOL_NAMES, DAEMON_PORT } from "@qweb/protocol";
 
 type ToolName = (typeof TOOL_NAMES)[number];
 
@@ -11,14 +11,23 @@ function isToolName(name: string): name is ToolName {
 export function handleHttpRequest(
   req: IncomingMessage,
   res: ServerResponse,
-  sessionManager: SessionManager
+  sessionManager: SessionManager,
+  startTime?: number
 ): boolean {
   const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
 
   // Health check
   if (url.pathname === "/health" && req.method === "GET") {
+    const uptime = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0;
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ status: "ok", extensions_connected: sessionManager.hasExtension() }));
+    res.end(JSON.stringify({
+      running: true,
+      port: DAEMON_PORT,
+      version: "1.0.0",
+      uptime_seconds: uptime,
+      extensions_connected: sessionManager.hasExtension(),
+      extension_version: sessionManager.getExtensionVersion(),
+    }));
     return true;
   }
 

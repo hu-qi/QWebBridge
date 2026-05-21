@@ -9,9 +9,10 @@ import type { Message } from "@qweb/protocol";
 export function createServer(sessionManager: SessionManager, port?: number): Promise<{ httpServer: ReturnType<typeof createHttpServer> }> {
   const config = loadConfig();
   const listenPort = port ?? config.port;
+  const startTime = Date.now();
 
   const httpServer = createHttpServer((req, res) => {
-    if (handleHttpRequest(req, res, sessionManager)) return;
+    if (handleHttpRequest(req, res, sessionManager, startTime)) return;
 
     if (req.url === "/shutdown" && req.method === "POST") {
       res.writeHead(200);
@@ -43,7 +44,7 @@ export function createServer(sessionManager: SessionManager, port?: number): Pro
 
           if (agent === "extension") {
             isExtension = true;
-            sessionManager.setExtension(ws);
+            sessionManager.setExtension(ws, payload.version);
             ws.send(JSON.stringify({
               id: msg.id,
               type: "hello_ack",
