@@ -9,7 +9,6 @@ const PREDEFINED_COLORS: Record<string, string> = {
 
 const sessionGroups = new Map<string, number>();
 let colorIndex = 0;
-let recoveryDone = false;
 
 const attachedTabs = new Set<number>();
 
