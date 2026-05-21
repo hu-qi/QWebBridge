@@ -37,7 +37,25 @@ export class CDPController {
     if (tabId === null) {
       throw new Error("No tab attached. Call attach(tabId) first.");
     }
-    return (await chrome.debugger.sendCommand({ tabId }, method, params as Record<string, never>)) as T;
+    try {
+      return (await chrome.debugger.sendCommand({ tabId }, method, params as Record<string, never>)) as T;
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes("Cannot find context") || msg.includes("Execution context was destroyed")) {
+        await this.ensureExecutionContext(tabId);
+        return (await chrome.debugger.sendCommand({ tabId }, method, params as Record<string, never>)) as T;
+      }
+      throw e;
+    }
+  }
+
+  private async ensureExecutionContext(tabId: number): Promise<void> {
+    try {
+      await chrome.debugger.sendCommand({ tabId }, "Runtime.enable", {});
+      await chrome.debugger.sendCommand({ tabId }, "Runtime.evaluate", { expression: "1", returnByValue: true });
+    } catch {
+      // Context may still be initializing
+    }
   }
 
   getCurrentTabId(): number | null {
