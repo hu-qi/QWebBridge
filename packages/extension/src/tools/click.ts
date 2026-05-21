@@ -1,4 +1,4 @@
-import { registerTool, type ToolExecutor, type ToolContext } from "./index.js";
+import { registerTool, getTabId, type ToolExecutor, type ToolContext } from "./index.js";
 
 const clickTool: ToolExecutor = {
   name: "click",
@@ -6,8 +6,7 @@ const clickTool: ToolExecutor = {
     const selector = params.selector as string;
     if (!selector) throw new Error("click: selector is required");
 
-    const tab = await ctx.cdp.getActiveTab();
-    await ctx.cdp.attach(tab.id!);
+    await ctx.cdp.attach(await getTabId(params, ctx));
 
     if (ctx.refs.isRef(selector)) {
       return clickByRef(selector, ctx);

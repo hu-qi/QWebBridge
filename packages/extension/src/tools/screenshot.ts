@@ -1,10 +1,9 @@
-import { registerTool, type ToolExecutor } from "./index.js";
+import { registerTool, getTabId, type ToolExecutor } from "./index.js";
 
 const screenshotTool: ToolExecutor = {
   name: "screenshot",
   async execute(params, ctx) {
-    const tab = await ctx.cdp.getActiveTab();
-    await ctx.cdp.attach(tab.id!);
+    await ctx.cdp.attach(await getTabId(params, ctx));
 
     const format = (params.format as string) || "png";
     const fullPage = params.fullPage as boolean | undefined;

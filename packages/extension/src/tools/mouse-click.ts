@@ -1,4 +1,4 @@
-import { registerTool, type ToolExecutor } from "./index.js";
+import { registerTool, getTabId, type ToolExecutor } from "./index.js";
 
 interface ToolCtx {
   cdp: { send: <T>(method: string, params?: Record<string, unknown>) => Promise<T> };
@@ -11,8 +11,7 @@ const mouseClickTool: ToolExecutor = {
     const selector = params.selector as string;
     if (!selector) throw new Error("mouse_click: selector is required");
 
-    const tab = await ctx.cdp.getActiveTab();
-    await ctx.cdp.attach(tab.id!);
+    await ctx.cdp.attach(await getTabId(params, ctx));
 
     let cx: number, cy: number, tag: string, text: string;
 

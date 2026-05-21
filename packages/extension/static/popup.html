@@ -1,25 +1,183 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
   <meta charset="utf-8">
-  <title>QwebBridge</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>QWebBridge</title>
   <style>
-    body { width: 280px; padding: 16px; font-family: system-ui; font-size: 14px; }
-    .status { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-    .dot { width: 8px; height: 8px; border-radius: 50%; }
-    .dot.connected { background: #22c55e; }
-    .dot.disconnected { background: #ef4444; }
-    h2 { margin: 0 0 8px 0; font-size: 16px; }
-    .info { color: #666; font-size: 12px; margin-bottom: 4px; }
+    *, ::before, ::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #ffffff;
+      --fg: #1a1a2e;
+      --muted: #8e8ea0;
+      --muted-bg: #f4f4f5;
+      --border: #e4e4e7;
+      --emerald: #059669;
+      --emerald-bg: #d1fae5;
+      --amber-50: #fffbeb;
+      --amber-300: #fcd34d;
+      --amber-600: #d97706;
+      --amber-800: #92400e;
+      --amber-900: #78350f;
+      --radius: 8px;
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    }
+    body {
+      width: 340px;
+      font-family: var(--font);
+      font-size: 14px;
+      line-height: 1.5;
+      color: var(--fg);
+      background: var(--bg);
+      -webkit-font-smoothing: antialiased;
+    }
+    .p-3 { padding: 12px; }
+    .pb-3 { padding-bottom: 12px; }
+    .flex { display: flex; }
+    .items-center { align-items: center; }
+    .gap-2 { gap: 8px; }
+    .space-y-3 > * + * { margin-top: 12px; }
+    .space-y-1 > * + * { margin-top: 4px; }
+    .space-y-2 > * + * { margin-top: 8px; }
+    .flex-col { flex-direction: column; }
+    .text-center { text-align: center; }
+    .py-4 { padding-top: 16px; padding-bottom: 16px; }
+    .justify-end { justify-content: flex-end; }
+    .justify-between { justify-content: space-between; }
+    .justify-center { justify-content: center; }
+    .flex-shrink-0 { flex-shrink: 0; }
+
+    .header { user-select: none; cursor: default; }
+    .header img { width: 28px; height: 28px; border-radius: 6px; pointer-events: none; }
+    .header-text { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+
+    .status-circle {
+      width: 40px; height: 40px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s;
+    }
+    .status-circle.connected { background: var(--emerald-bg); }
+    .status-circle.disconnected { background: var(--muted-bg); }
+    .status-circle svg { width: 20px; height: 20px; }
+
+    .status-text { font-size: 14px; font-weight: 500; }
+
+    .link {
+      display: block; text-align: center;
+      font-size: 12px; color: var(--muted);
+      text-decoration: none; transition: color 0.15s;
+    }
+    .link:hover { color: var(--fg); }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 500; line-height: 1;
+      padding: 6px 12px; border-radius: 6px; border: none;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .btn-ghost { background: transparent; color: var(--muted); }
+    .btn-ghost:hover { background: var(--muted-bg); color: var(--fg); }
+    .btn-primary { background: var(--fg); color: #fff; }
+    .btn-primary:hover { opacity: 0.9; }
+    .btn-destructive { background: #ef4444; color: #fff; }
+    .btn-destructive:hover { background: #dc2626; }
+    .btn-sm { padding: 4px 10px; font-size: 11px; }
+    .text-xs { font-size: 12px; }
+    .text-muted { color: var(--muted); }
+    .text-destructive { color: #ef4444; }
+    .mt-0\\.5 { margin-top: 2px; }
+    .rounded-md { border-radius: var(--radius); }
+    .border { border: 1px solid var(--border); }
+    .p-3 { padding: 12px; }
+
+    .hidden { display: none !important; }
+
+    label { font-size: 12px; font-weight: 500; color: var(--muted); display: block; margin-bottom: 4px; }
+    input[type="url"] {
+      width: 100%; padding: 6px 10px; font-size: 13px; font-family: var(--font);
+      border: 1px solid var(--border); border-radius: 6px; outline: none;
+      transition: border-color 0.15s;
+    }
+    input[type="url"]:focus { border-color: var(--fg); }
+    .input-row { display: flex; gap: 6px; }
+    .input-row input { flex: 1; }
+    .test-result { font-size: 11px; margin-top: 4px; }
+    .test-ok { color: var(--emerald); }
+    .test-fail { color: #ef4444; }
+    .test-pending { color: var(--muted); }
+
+    .trust-card {
+      border: 1px solid var(--amber-300); background: var(--amber-50);
+      border-radius: var(--radius); padding: 12px;
+    }
+    .trust-card svg { width: 16px; height: 16px; color: var(--amber-600); flex-shrink: 0; }
   </style>
 </head>
 <body>
-  <h2>QwebBridge</h2>
-  <div class="status">
-    <div id="status-dot" class="dot disconnected"></div>
-    <span id="status-text">Disconnected</span>
+  <div class="p-3" id="app">
+    <!-- Header -->
+    <div class="header flex items-center gap-2 pb-3" id="logo-area">
+      <img src="/icon/128.png" alt="" draggable="false" id="logo-img">
+      <span class="header-text">QWebBridge</span>
+    </div>
+
+    <!-- Main content -->
+    <div id="main-content">
+      <!-- Status -->
+      <div class="flex flex-col items-center gap-3 py-4 text-center" id="status-section">
+        <div class="status-circle disconnected" id="status-icon">
+          <svg id="icon-disconnected" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
+          <svg id="icon-connected" class="hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        </div>
+        <p class="status-text" id="status-text">浏览器助手未就绪</p>
+      </div>
+
+      <!-- CTA / Link -->
+      <div id="cta-section">
+        <a href="#" class="link" id="guide-link">查看安装指引</a>
+      </div>
+    </div>
+
+    <!-- Trust warning (hidden) -->
+    <div id="trust-screen" class="hidden space-y-2">
+      <div class="trust-card space-y-2">
+        <div class="flex items-start gap-2">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mt-0.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <div class="space-y-1">
+            <p class="text-xs" style="font-weight: 600; color: var(--amber-900);">该服务将获得控制你浏览器的权限</p>
+            <p class="text-xs" style="color: var(--amber-800);">它能点击、打字、读取页面内容、操作标签页。仅在你完全信任该服务端时继续。</p>
+            <p class="text-xs hidden" id="insecure-warning" style="color: var(--amber-800);">⚠ 连接未加密（ws://），同网络的人可监听或篡改流量。</p>
+          </div>
+        </div>
+        <div class="flex gap-2 justify-end">
+          <button class="btn btn-ghost btn-sm" id="trust-cancel">取消</button>
+          <button class="btn btn-destructive btn-sm" id="trust-confirm">我信任 — 连接</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dev settings (hidden) -->
+    <div id="dev-settings" class="hidden space-y-3">
+      <div class="space-y-1">
+        <label for="ws-url">Daemon WebSocket 地址</label>
+        <div class="input-row">
+          <input type="url" id="ws-url" placeholder="ws://127.0.0.1:10086/selector/command">
+          <button class="btn btn-ghost btn-sm" id="dev-test-btn">测试</button>
+        </div>
+        <div id="dev-test-result" class="test-result hidden"></div>
+      </div>
+      <div class="flex justify-between">
+        <button class="btn btn-ghost btn-sm" id="dev-reset">恢复默认</button>
+        <button class="btn btn-primary btn-sm" id="dev-save">保存</button>
+      </div>
+      <div class="border-t pt-2 flex justify-end">
+        <button class="btn btn-ghost btn-sm text-xs" id="dev-exit">退出开发者模式</button>
+      </div>
+    </div>
+
+    <!-- Click counter (hidden) -->
+    <span id="click-counter" class="hidden"></span>
   </div>
-  <div class="info" id="info-text">Connect to daemon: qweb-bridge run</div>
   <script src="popup.js"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 import { defineConfig } from "vite";
 import { resolve } from "path";
-import { copyFileSync, existsSync, mkdirSync } from "fs";
+import { copyFileSync, cpSync, existsSync, mkdirSync } from "fs";
 
 export default defineConfig({
   build: {
@@ -26,6 +26,12 @@ export default defineConfig({
         copyFileSync(resolve(staticDir, "manifest.json"), resolve(distDir, "manifest.json"));
         copyFileSync(resolve(staticDir, "popup.html"), resolve(distDir, "popup.html"));
         copyFileSync(resolve(staticDir, "popup.js"), resolve(distDir, "popup.js"));
+        // Copy icon and _locales directories
+        for (const dir of ["icon", "_locales"]) {
+          const src = resolve(staticDir, dir);
+          const dst = resolve(distDir, dir);
+          if (existsSync(src)) cpSync(src, dst, { recursive: true });
+        }
       },
     },
   ],

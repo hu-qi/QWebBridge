@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <rect width="128" height="128" rx="24" fill="#1a1a2e"/>
+  <!-- Bridge arch -->
+  <path d="M18 88C30 54 48 40 64 40C80 40 98 54 110 88" fill="none" stroke="#059669" stroke-width="9" stroke-linecap="round"/>
+  <!-- Bridge deck -->
+  <path d="M22 88L106 88" stroke="#d1fae5" stroke-width="7" stroke-linecap="round"/>
+  <!-- Vertical cables -->
+  <line x1="38" y1="88" x2="38" y2="64" stroke="#059669" stroke-width="5" stroke-linecap="round"/>
+  <line x1="52" y1="88" x2="52" y2="52" stroke="#059669" stroke-width="5" stroke-linecap="round"/>
+  <line x1="64" y1="88" x2="64" y2="44" stroke="#059669" stroke-width="5" stroke-linecap="round"/>
+  <line x1="76" y1="88" x2="76" y2="52" stroke="#059669" stroke-width="5" stroke-linecap="round"/>
+  <line x1="90" y1="88" x2="90" y2="64" stroke="#059669" stroke-width="5" stroke-linecap="round"/>
+  <!-- Base -->
+  <rect x="20" y="96" width="88" height="8" rx="2" fill="#059669"/>
+  <!-- Top nodes and link -->
+  <circle cx="44" cy="32" r="7" fill="#059669"/>
+  <circle cx="84" cy="32" r="7" fill="#059669"/>
+  <line x1="44" y1="32" x2="84" y2="32" stroke="#d1fae5" stroke-width="4" stroke-linecap="round"/>
+  <!-- Search icon -->
+  <circle cx="100" cy="104" r="8" fill="none" stroke="#d1fae5" stroke-width="5"/>
+  <line x1="106" y1="110" x2="114" y2="118" stroke="#d1fae5" stroke-width="5" stroke-linecap="round"/>
+</svg>

@@ -1,4 +1,4 @@
-import { registerTool, type ToolExecutor } from "./index.js";
+import { registerTool, getTabId, type ToolExecutor } from "./index.js";
 import { groupTab, trackTab } from "../tab-manager.js";
 
 const navigateTool: ToolExecutor = {
@@ -13,7 +13,7 @@ const navigateTool: ToolExecutor = {
 
     if (newTab) {
       const tab = await chrome.tabs.create({ url, active: true });
-      const agentSession = session || "agent";
+      const agentSession = session || "default";
       await groupTab(tab.id!, agentSession, groupTitle);
       await ctx.cdp.attach(tab.id!);
       trackTab(tab.id!);
@@ -21,9 +21,9 @@ const navigateTool: ToolExecutor = {
       return { success: true, url, tabId: tab.id! };
     }
 
-    const tab = await ctx.cdp.getActiveTab();
-    await ctx.cdp.attach(tab.id!);
-    trackTab(tab.id!);
+    const tabId = await getTabId(params, ctx);
+    await ctx.cdp.attach(tabId);
+    trackTab(tabId);
     await ctx.cdp.send("Page.navigate", { url });
     await waitForLoad(tab.id!);
     return { success: true, url, tabId: tab.id! };
