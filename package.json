@@ -9,6 +9,9 @@
     "format": "prettier --write 'packages/*/src/**/*.ts'",
     "format:check": "prettier --check 'packages/*/src/**/*.ts'"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
+  },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^8.59.4",
     "@typescript-eslint/parser": "^8.59.4",
