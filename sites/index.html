@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QWebBridge — Open-Source Browser Bridge for AI Agents</title>
+<meta name="description" content="QWebBridge lets AI agents control your real browser — navigate, click, fill forms, take screenshots, and extract data using your real login sessions. Open-source, self-hosted, Kimi WebBridge compatible.">
+<meta name="keywords" content="browser automation, AI agent, browser bridge, web automation, Chrome extension, CDP, DevTools Protocol, AI browser control, open source, Kimi WebBridge">
+<meta name="robots" content="index, follow">
+<meta name="language" content="English">
+<meta property="og:title" content="QWebBridge — Open-Source Browser Bridge for AI Agents">
+<meta property="og:description" content="Let AI agents drive your real browser. Navigate, click, fill, screenshot, and extract — using your existing login sessions.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://github.com/hu-qi/QWebBridge">
+<meta property="og:image" content="https://raw.githubusercontent.com/hu-qi/QWebBridge/main/chrome-screenshot.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="QWebBridge — Open-Source Browser Bridge for AI Agents">
+<meta name="twitter:description" content="Let AI agents control your real browser. 16 automation tools. WebSocket, MCP, HTTP, CLI.">
+<link rel="icon" type="image/svg+xml" href="packages/extension/static/icon/16.svg">
+<link rel="canonical" href="https://github.com/hu-qi/QWebBridge">
+
+<script type="application/ld+json">
+[{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "QWebBridge",
+  "description": "Open-source browser bridge that lets AI agents control a real Chrome browser via WebSocket, MCP, HTTP, and CLI.",
+  "url": "https://github.com/hu-qi/QWebBridge",
+  "applicationCategory": "DeveloperApplication",
+  "operatingSystem": "macOS, Linux, Windows",
+  "browserRequirements": "Chrome",
+  "softwareVersion": "1.0.0",
+  "license": "https://opensource.org/licenses/MIT",
+  "author": {
+    "@type": "Person",
+    "name": "hu-qi",
+    "url": "https://github.com/hu-qi"
+  },
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+  }
+},
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "How does QWebBridge work?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "QWebBridge pairs a local daemon (Node.js on localhost:10086) with a Chrome extension. The AI agent sends commands via WebSocket or MCP to the daemon, which forwards them to the Chrome extension. The extension uses Chrome DevTools Protocol (CDP) to control the browser. Everything runs locally."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What is the difference from Kimi WebBridge?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "QWebBridge is an open-source, self-hosted reimplementation that is protocol-compatible with Kimi WebBridge. It adds MCP support, HTTP REST API, and a full CLI in addition to the standard WebSocket protocol."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Which AI agents are supported?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "QWebBridge works with any agent that supports WebSocket, MCP, HTTP, or CLI. This includes Claude Code, Kimi Code, Cursor, Codex, Hermes, OpenClaw, and custom-built agents."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is my data safe? Do sessions leave my machine?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes, it is safe. The daemon and extension communicate locally on your machine. No data, login sessions, cookies, or page content ever leave your device. The daemon listens only on localhost:10086."
+      }
+    }
+  ]
+}]
+</script>
+
+<style>
+  /* Reset & base */
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #0a0a0f;
+    --bg2: #0e0e18;
+    --bg-card: #12121f;
+    --bg-card-hover: #1a1a2c;
+    --border: #1e1e35;
+    --text: #e4e4ed;
+    --text-dim: #6b6b85;
+    --text-muted: #9494b0;
+    --accent: #059669;
+    --accent-hover: #047857;
+    --accent-glow: rgba(5,150,105,0.12);
+    --accent-light: #d1fae5;
+    --radius-sm: 8px;
+    --radius: 12px;
+    --radius-lg: 16px;
+    --max-w: 1120px;
+    --font: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --mono: "SF Mono","Fira Code","Cascadia Code",monospace;
+  }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+  a { color: inherit; text-decoration: none; }
+  code {
+    font-family: var(--mono);
+    font-size: .875em;
+    background: rgba(255,255,255,.05);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--accent-light);
+  }
+  pre, .code-block { font-family: var(--mono); }
+
+  /* Nav */
+  nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    max-width: var(--max-w);
+    margin: 0 auto;
+    padding: 18px 24px;
+  }
+  nav .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  nav .logo svg { width: 28px; height: 28px; }
+  nav .links { display: flex; gap: 28px; align-items: center; }
+  nav .links a {
+    color: var(--text-muted);
+    font-size: 14px;
+    transition: color .2s;
+  }
+  nav .links a:hover { color: var(--accent-light); }
+  nav .github-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-muted);
+    transition: all .2s;
+  }
+  nav .github-btn:hover { border-color: var(--accent); color: var(--text); }
+
+  /* Hero */
+  .hero {
+    text-align: center;
+    padding: 60px 24px 50px;
+    max-width: 720px;
+    margin: 0 auto;
+  }
+  .hero .logo-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    background: var(--accent-glow);
+    border: 1px solid rgba(5,150,105,.2);
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--accent);
+    margin-bottom: 28px;
+  }
+  .hero .logo-badge svg { width: 14px; height: 14px; }
+  .hero h1 {
+    font-size: clamp(34px, 5vw, 52px);
+    font-weight: 700;
+    letter-spacing: -.025em;
+    line-height: 1.12;
+    margin-bottom: 16px;
+  }
+  .hero h1 span { color: var(--accent); }
+  .hero .sub {
+    font-size: 18px;
+    color: var(--text-muted);
+    margin-bottom: 32px;
+    max-width: 560px;
+    margin-left: auto;
+    margin-right: auto;
+    line-height: 1.5;
+  }
+  .hero .actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 28px;
+    border-radius: var(--radius-sm);
+    font-size: 15px;
+    font-weight: 500;
+    transition: all .2s;
+    cursor: pointer;
+    border: none;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 0 20px var(--accent-glow);
+  }
+  .btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); }
+  .btn-secondary {
+    background: var(--bg-card);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover { background: var(--bg-card-hover); border-color: var(--accent); }
+
+  .hero .meta-row {
+    display: flex;
+    justify-content: center;
+    gap: 32px;
+    margin-top: 40px;
+    flex-wrap: wrap;
+  }
+  .hero .meta-item { text-align: center; }
+  .hero .meta-item .num {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .hero .meta-item .label {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+
+  /* Section common */
+  section { padding: 72px 24px; }
+  section .inner { max-width: var(--max-w); margin: 0 auto; }
+  .section-label {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+  .section-title {
+    font-size: clamp(26px, 3.5vw, 34px);
+    font-weight: 700;
+    margin-bottom: 12px;
+    letter-spacing: -.015em;
+    line-height: 1.2;
+  }
+  .section-desc {
+    font-size: 15px;
+    color: var(--text-muted);
+    max-width: 600px;
+    margin-bottom: 44px;
+    line-height: 1.6;
+  }
+
+  /* Architecture */
+  #how-it-works .pipeline {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 36px 32px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+  }
+  .pipeline .step {
+    text-align: center;
+    padding: 16px 20px;
+    min-width: 125px;
+  }
+  .pipeline .step .icon { font-size: 26px; margin-bottom: 6px; }
+  .pipeline .step .name { font-weight: 600; font-size: 14px; }
+  .pipeline .step .desc { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+  .pipeline .arrow { color: var(--text-dim); font-size: 18px; }
+
+  /* Protocol cards (like Playwright) */
+  .proto-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: 16px;
+  }
+  .proto-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px 24px;
+    transition: all .2s;
+    display: flex;
+    flex-direction: column;
+  }
+  .proto-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .proto-card .tag {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .05em;
+    padding: 3px 10px;
+    background: var(--accent-glow);
+    color: var(--accent);
+    border-radius: 4px;
+    margin-bottom: 14px;
+    width: fit-content;
+  }
+  .proto-card h3 { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+  .proto-card p { font-size: 13px; color: var(--text-muted); line-height: 1.6; flex: 1; }
+  .proto-card .copy {
+    display: inline-block;
+    margin-top: 14px;
+    padding: 7px 14px;
+    background: rgba(255,255,255,.04);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent-light);
+    cursor: pointer;
+    transition: all .2s;
+    width: fit-content;
+  }
+  .proto-card .copy:hover { background: rgba(5,150,105,.1); border-color: var(--accent); }
+
+  /* Features */
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: 12px;
+  }
+  .feat-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    transition: all .2s;
+  }
+  .feat-card:hover { background: var(--bg-card-hover); border-color: var(--accent); }
+  .feat-card .icon {
+    width: 36px; height: 36px;
+    background: var(--accent-glow);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    margin-bottom: 12px;
+  }
+  .feat-card h3 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+  .feat-card p { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+
+  /* Use Cases (like Browserbase) */
+  .cases-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 12px;
+  }
+  .case-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    transition: all .2s;
+  }
+  .case-card:hover { border-color: var(--accent); }
+  .case-card .emoji { font-size: 22px; margin-bottom: 10px; }
+  .case-card h3 { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+  .case-card p { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+
+  /* Install */
+  #install .tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 0;
+    flex-wrap: wrap;
+  }
+  #install .tab-btn {
+    padding: 10px 20px;
+    border: 1px solid var(--border);
+    border-bottom: none;
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    background: transparent;
+    color: var(--text-dim);
+    font-size: 13px;
+    font-weight: 500;
+    font-family: var(--mono);
+    cursor: pointer;
+    transition: all .2s;
+  }
+  #install .tab-btn:hover { color: var(--text); background: var(--bg-card); }
+  #install .tab-btn.active {
+    background: var(--bg-card);
+    color: var(--accent-light);
+    border-color: var(--accent);
+    border-bottom-color: var(--bg-card);
+  }
+  #install .tab-content {
+    display: none;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) var(--radius-sm);
+    padding: 24px;
+    overflow-x: auto;
+  }
+  #install .tab-content.active { display: block; }
+  #install .tab-content .comment { color: #6b7280; }
+  #install .tab-content .prompt { color: #a78bfa; }
+
+  .setup-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin: 28px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .setup-steps li {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+  }
+  .setup-steps .num {
+    flex-shrink: 0;
+    width: 28px; height: 28px;
+    background: var(--accent-glow);
+    color: var(--accent);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 13px;
+    margin-top: 2px;
+  }
+  .setup-steps .step-content { padding-top: 2px; }
+  .setup-steps .step-content strong { display: block; font-size: 14px; }
+  .setup-steps .step-content p { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+
+  .prereqs {
+    display: flex;
+    gap: 20px;
+    margin: 24px 0 0;
+    flex-wrap: wrap;
+    padding: 16px 20px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+  }
+  .prereqs .item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-muted); }
+  .prereqs .check { color: var(--accent); font-weight: 700; }
+
+  .store-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px 18px;
+    margin: 0 0 22px;
+    background: var(--accent-glow);
+    border: 1px solid rgba(5,150,105,.22);
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  .store-note strong { color: var(--text); display: block; margin-bottom: 2px; }
+  .store-note .mark {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    background: rgba(5,150,105,.16);
+    color: var(--accent-light);
+    font-weight: 700;
+  }
+  .store-note a { color: var(--accent-light); text-decoration: underline; text-underline-offset: 3px; }
+
+
+  /* FAQ */
+  .faq-list { display: flex; flex-direction: column; gap: 4px; }
+  .faq-item {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .faq-q {
+    padding: 18px 22px;
+    font-weight: 600;
+    font-size: 15px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background .2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .faq-q:hover { background: var(--bg-card-hover); }
+  .faq-q .arrow { transition: transform .3s; font-size: 13px; color: var(--text-dim); }
+  .faq-item.open .faq-q .arrow { transform: rotate(180deg); }
+  .faq-a {
+    padding: 0 22px;
+    max-height: 0;
+    overflow: hidden;
+    transition: all .3s ease;
+    font-size: 14px;
+    color: var(--text-muted);
+    line-height: 1.7;
+  }
+  .faq-item.open .faq-a { padding: 0 22px 18px; max-height: 300px; }
+
+  /* Footer */
+  footer {
+    max-width: var(--max-w);
+    margin: 0 auto;
+    padding: 40px 24px 32px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    border-top: 1px solid var(--border);
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+  footer a { color: var(--accent); }
+  footer a:hover { text-decoration: underline; }
+  footer .socials { display: flex; gap: 16px; }
+  footer .socials a { color: var(--text-dim); font-size: 13px; }
+  footer .socials a:hover { color: var(--text); }
+
+  @media (max-width: 640px) {
+    nav .links { display: none; }
+    .pipeline .arrow { display: none; }
+    .pipeline { flex-direction: column; }
+    .hero { padding: 40px 20px 36px; }
+    section { padding: 48px 20px; }
+    footer { flex-direction: column; text-align: center; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">
+    <svg viewBox="0 0 128 128" fill="none">
+      <rect width="128" height="128" rx="24" fill="#1a1a2e"/>
+      <path d="M18 88C30 54 48 40 64 40C80 40 98 54 110 88" fill="none" stroke="#059669" stroke-width="9" stroke-linecap="round"/>
+      <path d="M22 88L106 88" stroke="#d1fae5" stroke-width="7" stroke-linecap="round"/>
+      <line x1="38" y1="88" x2="38" y2="64" stroke="#059669" stroke-width="5" stroke-linecap="round"/>
+      <line x1="52" y1="88" x2="52" y2="52" stroke="#059669" stroke-width="5" stroke-linecap="round"/>
+      <line x1="64" y1="88" x2="64" y2="44" stroke="#059669" stroke-width="5" stroke-linecap="round"/>
+      <line x1="76" y1="88" x2="76" y2="52" stroke="#059669" stroke-width="5" stroke-linecap="round"/>
+      <line x1="90" y1="88" x2="90" y2="64" stroke="#059669" stroke-width="5" stroke-linecap="round"/>
+      <rect x="20" y="96" width="88" height="8" rx="2" fill="#059669"/>
+      <circle cx="44" cy="32" r="7" fill="#059669"/>
+      <circle cx="84" cy="32" r="7" fill="#059669"/>
+      <line x1="44" y1="32" x2="84" y2="32" stroke="#d1fae5" stroke-width="4" stroke-linecap="round"/>
+      <circle cx="100" cy="104" r="8" fill="none" stroke="#d1fae5" stroke-width="5"/>
+      <line x1="106" y1="110" x2="114" y2="118" stroke="#d1fae5" stroke-width="5" stroke-linecap="round"/>
+    </svg>
+    QWebBridge
+  </div>
+  <div class="links">
+    <a href="#features">Features</a>
+    <a href="#protocols">Protocols</a>
+    <a href="#install">Install</a>
+    <a href="#faq">FAQ</a>
+    <a href="https://chromewebstore.google.com/detail/mohjaglfjdkhmoidelfhpicblfnebacj" target="_blank">Chrome Store</a>
+    <a href="https://github.com/hu-qi/QWebBridge" target="_blank" class="github-btn">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      GitHub
+    </a>
+  </div>
+</nav>
+
+<section class="hero">
+  <div class="logo-badge">
+    <svg viewBox="0 0 128 128" fill="none">
+      <path d="M18 88C30 54 48 40 64 40C80 40 98 54 110 88" fill="none" stroke="#059669" stroke-width="9" stroke-linecap="round"/>
+      <path d="M22 88L106 88" stroke="#d1fae5" stroke-width="7" stroke-linecap="round"/>
+    </svg>
+    Open source &middot; MIT
+  </div>
+  <h1>Let AI agents <span>drive your browser</span></h1>
+  <p class="sub">QWebBridge gives AI agents full control over your real Chrome browser — navigate, click, fill forms, screenshot, and extract data using your own login sessions.</p>
+  <div class="actions">
+    <a href="#install" class="btn btn-primary">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0a8 8 0 110 16A8 8 0 018 0zM7.5 4a1 1 0 00-1 1v2H4.5a1 1 0 000 2H6.5v2a1 1 0 002 0V9h2a1 1 0 000-2H8.5V5a1 1 0 00-1-1z"/></svg>
+      Get started
+    </a>
+    <a href="https://chromewebstore.google.com/detail/mohjaglfjdkhmoidelfhpicblfnebacj" target="_blank" class="btn btn-secondary">Add Chrome Extension</a>
+    <a href="https://github.com/hu-qi/QWebBridge" target="_blank" class="btn btn-secondary">View on GitHub</a>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><div class="num">16</div><div class="label">Tools</div></div>
+    <div class="meta-item"><div class="num">4</div><div class="label">Protocols</div></div>
+    <div class="meta-item"><div class="num">1</div><div class="label">Command to install</div></div>
+  </div>
+</section>
+
+<section id="how-it-works">
+  <div class="inner">
+    <div class="section-label">Architecture</div>
+    <h2 class="section-title">How it works</h2>
+    <p class="section-desc">A local service, Chrome extension, and agent skill connect your AI agent to your real browser through Chrome DevTools Protocol.</p>
+    <div class="pipeline">
+      <div class="step"><div class="icon">🤖</div><div class="name">AI Agent</div><div class="desc">Claude Code, Kimi Code, Cursor ...</div></div>
+      <div class="arrow">→</div>
+      <div class="step"><div class="icon">📦</div><div class="name">Agent Skill</div><div class="desc">tool usage guide</div></div>
+      <div class="arrow">→</div>
+      <div class="step"><div class="icon">🌉</div><div class="name">QWebBridge Daemon</div><div class="desc">localhost:10086</div></div>
+      <div class="arrow">→</div>
+      <div class="step"><div class="icon">🔌</div><div class="name">Chrome Extension</div><div class="desc">CDP via chrome.debugger</div></div>
+      <div class="arrow">→</div>
+      <div class="step"><div class="icon">🌐</div><div class="name">Your Browser</div><div class="desc">Real tabs, real sessions</div></div>
+    </div>
+  </div>
+</section>
+
+<section id="features">
+  <div class="inner">
+    <div class="section-label">Features</div>
+    <h2 class="section-title">16 browser automation tools</h2>
+    <p class="section-desc">Everything an AI agent needs to browse the web, interact with pages, and extract information.</p>
+    <div class="features-grid">
+      <div class="feat-card"><div class="icon">🧭</div><h3>navigate</h3><p>Navigate to any URL. Opens new tabs with session-based grouping and auto-load waiting.</p></div>
+      <div class="feat-card"><div class="icon">📋</div><h3>snapshot</h3><p>Get the full accessibility tree with <code>@eN</code> refs for reliable element targeting.</p></div>
+      <div class="feat-card"><div class="icon">📸</div><h3>screenshot</h3><p>Capture screenshots in PNG, JPEG, or WebP. Supports full-page and element capture.</p></div>
+      <div class="feat-card"><div class="icon">👆</div><h3>click</h3><p>Click elements by CSS selector or accessibility ref. Auto-scrolls into view.</p></div>
+      <div class="feat-card"><div class="icon">✏️</div><h3>fill</h3><p>Fill forms, textareas, and rich editors (ProseMirror, Lexical, Slate, Quill).</p></div>
+      <div class="feat-card"><div class="icon">⚡</div><h3>evaluate</h3><p>Run arbitrary JavaScript in the page. Supports async/await.</p></div>
+      <div class="feat-card"><div class="icon">🖱️</div><h3>mouse_click</h3><p>Real mouse event dispatch at element coordinates.</p></div>
+      <div class="feat-card"><div class="icon">⌨️</div><h3>key_type</h3><p>Type text character by character via CDP.</p></div>
+      <div class="feat-card"><div class="icon">🔑</div><h3>send_keys</h3><p>Keyboard shortcuts with modifier keys — Control, Alt, Shift, Meta.</p></div>
+      <div class="feat-card"><div class="icon">📎</div><h3>upload</h3><p>Upload files to inputs. Supports multiple files.</p></div>
+      <div class="feat-card"><div class="icon">🌐</div><h3>network</h3><p>Monitor network requests — start, stop, list, inspect.</p></div>
+      <div class="feat-card"><div class="icon">🔍</div><h3>find_tab</h3><p>Find an open tab by URL. Target active tab or first match.</p></div>
+      <div class="feat-card"><div class="icon">📑</div><h3>list_tabs</h3><p>List all open tabs with URL, title, and session group.</p></div>
+      <div class="feat-card"><div class="icon">❌</div><h3>close_tab</h3><p>Close the current tab or a specific tab by ID.</p></div>
+      <div class="feat-card"><div class="icon">🧹</div><h3>close_session</h3><p>Close all tabs in an AI session — one command cleanup.</p></div>
+      <div class="feat-card"><div class="icon">📄</div><h3>save_as_pdf</h3><p>Render page to PDF with configurable format and scale.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="use-cases">
+  <div class="inner">
+    <div class="section-label">Use Cases</div>
+    <h2 class="section-title">What you can build</h2>
+    <p class="section-desc">From automated testing to AI-powered research — if you can do it in a browser, your AI agent can too.</p>
+    <div class="cases-grid">
+      <div class="case-card"><div class="emoji">🔍</div><h3>Web research at scale</h3><p>Have your agent search, read, and compile information from hundreds of pages automatically.</p></div>
+      <div class="case-card"><div class="emoji">📊</div><h3>Data extraction</h3><p>Pull structured data from SaaS dashboards, CRM systems, and internal tools — APIs not required.</p></div>
+      <div class="case-card"><div class="emoji">🧪</div><h3>Automated testing</h3><p>Run end-to-end tests through real browser sessions with full network monitoring.</p></div>
+      <div class="case-card"><div class="emoji">🔄</div><h3>Workflow automation</h3><p>Automate repetitive browser tasks: form filling, file uploads, multi-step approvals.</p></div>
+      <div class="case-card"><div class="emoji">👀</div><h3>Monitoring & alerts</h3><p>Track prices, job listings, product changes, and competitor moves as they happen.</p></div>
+      <div class="case-card"><div class="emoji">🎯</div><h3>Form & CAPTCHA handling</h3><p>Let your agent handle login forms, job applications, and vendor portals.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="protocols">
+  <div class="inner">
+    <div class="section-label">Integration</div>
+    <h2 class="section-title">Works with any AI agent</h2>
+    <p class="section-desc">Connect your preferred coding agent through the protocol that fits your workflow.</p>
+    <div class="proto-grid">
+      <div class="proto-card">
+        <div class="tag">WebSocket</div>
+        <h3>WebSocket API</h3>
+        <p>Kimi WebBridge compatible protocol. Connect any agent that speaks WebSocket.</p>
+        <span class="copy" onclick="copyText(this)">ws://localhost:10086/selector/command</span>
+      </div>
+      <div class="proto-card">
+        <div class="tag">MCP</div>
+        <h3>Model Context Protocol</h3>
+        <p>Standard MCP server for Claude Desktop, Cursor, Windsurf, and any MCP client.</p>
+        <span class="copy" onclick="copyText(this)">qweb-bridge mcp</span>
+      </div>
+      <div class="proto-card">
+        <div class="tag">REST</div>
+        <h3>HTTP API</h3>
+        <p>Simple HTTP POST interface for custom scripts and integrations.</p>
+        <span class="copy" onclick="copyText(this)">POST /api/tool/&lt;name&gt;</span>
+      </div>
+      <div class="proto-card">
+        <div class="tag">CLI</div>
+        <h3>Command Line</h3>
+        <p>Direct terminal access for quick browser automation from your shell.</p>
+        <span class="copy" onclick="copyText(this)">qweb-bridge &lt;command&gt;</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="install">
+  <div class="inner">
+    <div class="section-label">Install</div>
+    <h2 class="section-title">Get started in 1 minute</h2>
+    <p class="section-desc">QWebBridge needs three parts: the local daemon, the Chrome extension, and the AI agent skill. Prerequisites: <strong>Chrome browser</strong> and <strong>Node.js &ge; 18</strong>.</p>
+
+    <div class="store-note">
+      <span class="mark">1</span>
+      <div>
+        <strong>Chrome extension is now available on Chrome Web Store</strong>
+        Install the browser-side component from <a href="https://chromewebstore.google.com/detail/mohjaglfjdkhmoidelfhpicblfnebacj" target="_blank">Chrome Web Store</a>, then start the local daemon and install the agent skill below.
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="curl">curl</button>
+      <button class="tab-btn" data-tab="npm">npm</button>
+      <button class="tab-btn" data-tab="pnpm">pnpm</button>
+      <button class="tab-btn" data-tab="manual">Manual</button>
+    </div>
+
+    <div class="tab-content active" id="tab-curl">
+      <span class="comment"># One-command install (macOS / Linux)</span><br>
+      curl -fsSL https://github.com/hu-qi/QWebBridge/raw/main/install.sh | bash
+    </div>
+
+    <div class="tab-content" id="tab-npm">
+      <span class="comment"># Not yet published to npm — use curl or manual build</span><br>
+      <span class="comment"># Stay tuned: npm package coming soon</span>
+    </div>
+
+    <div class="tab-content" id="tab-pnpm">
+      <span class="comment"># Install dependencies</span><br>
+      pnpm install<br><br>
+      <span class="comment"># Build all packages</span><br>
+      pnpm build
+    </div>
+
+    <div class="tab-content" id="tab-manual">
+      <span class="prompt">$</span> git clone https://github.com/hu-qi/QWebBridge.git<br>
+      <span class="prompt">$</span> cd QWebBridge<br>
+      <span class="prompt">$</span> pnpm install<br>
+      <span class="prompt">$</span> pnpm build<br>
+      <span class="prompt">$</span> node packages/daemon/dist/cli.js run
+    </div>
+
+    <h3 style="margin-top: 28px; font-size: 16px; font-weight: 600;">Setup steps</h3>
+    <ol class="setup-steps">
+      <li>
+        <div class="num">1</div>
+        <div class="step-content">
+          <strong>Start the daemon</strong>
+          <p>Run <code>qweb-bridge start</code> or <code>node packages/daemon/dist/cli.js run</code>. The daemon listens on <code>localhost:10086</code>.</p>
+        </div>
+      </li>
+      <li>
+        <div class="num">2</div>
+        <div class="step-content">
+          <strong>Install the Chrome extension</strong>
+          <p>Install from <a href="https://chromewebstore.google.com/detail/mohjaglfjdkhmoidelfhpicblfnebacj" target="_blank" style="color: var(--accent-light); text-decoration: underline;">Chrome Web Store</a>. For local development, you can still use <code>chrome://extensions</code> and load <code>packages/extension/dist</code>.</p>
+        </div>
+      </li>
+      <li>
+        <div class="num">3</div>
+        <div class="step-content">
+          <strong>Install the AI agent skill</strong>
+          <p>Run <code>qweb-bridge install-skill</code>. The skill tells your AI agent how to use QWebBridge tools, sessions, screenshots, and troubleshooting commands.</p>
+        </div>
+      </li>
+      <li>
+        <div class="num">4</div>
+        <div class="step-content">
+          <strong>Connect your AI agent</strong>
+          <p>Point your agent to <code>ws://localhost:10086/selector/command</code> (WebSocket) or run <code>qweb-bridge mcp</code> (MCP). Run <code>qweb-bridge status</code> to verify <code>extensions_connected: true</code>.</p>
+        </div>
+      </li>
+    </ol>
+
+    <div class="prereqs">
+      <span class="item"><span class="check">✓</span> Chrome browser</span>
+      <span class="item"><span class="check">✓</span> Node.js &ge; 18</span>
+      <span class="item"><span class="check">✓</span> AI agent skill</span>
+    </div>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="inner">
+    <div class="section-label">FAQ</div>
+    <h2 class="section-title">Frequently asked questions</h2>
+    <div class="faq-list">
+      <div class="faq-item open">
+        <div class="faq-q" role="button" tabindex="0" onclick="toggleFaq(this)" onkeydown="if(event.key==='Enter')toggleFaq(this)">
+          How does QWebBridge work?
+          <span class="arrow">▾</span>
+        </div>
+        <div class="faq-a">QWebBridge pairs a local daemon with a Chrome extension. The AI agent sends commands via WebSocket, MCP, or HTTP to the daemon on <code>localhost:10086</code>, which forwards them to the Chrome extension. The extension uses Chrome DevTools Protocol (CDP) to control the browser — navigating, clicking, screenshotting, and reading pages. Everything runs locally on your machine.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" role="button" tabindex="0" onclick="toggleFaq(this)" onkeydown="if(event.key==='Enter')toggleFaq(this)">
+          What's the difference from Kimi WebBridge?
+          <span class="arrow">▾</span>
+        </div>
+        <div class="faq-a">QWebBridge is an open-source, self-hosted reimplementation that is <strong>protocol-compatible</strong> with Kimi WebBridge. Any agent that works with Kimi WebBridge can use QWebBridge seamlessly. QWebBridge additionally supports MCP (Model Context Protocol), HTTP REST API, and a full CLI, giving you more integration options.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" role="button" tabindex="0" onclick="toggleFaq(this)" onkeydown="if(event.key==='Enter')toggleFaq(this)">
+          Which AI agents are supported?
+          <span class="arrow">▾</span>
+        </div>
+        <div class="faq-a">QWebBridge works with any agent that can connect via WebSocket or MCP. This includes <strong>Claude Code</strong>, <strong>Kimi Code</strong>, <strong>Cursor</strong>, <strong>GitHub Copilot</strong> (Codex), <strong>Hermes</strong>, <strong>OpenClaw</strong>, and custom-built agents. The project ships with a reusable <code>SKILL.md</code> that AI agents can auto-discover.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" role="button" tabindex="0" onclick="toggleFaq(this)" onkeydown="if(event.key==='Enter')toggleFaq(this)">
+          Is my data safe?
+          <span class="arrow">▾</span>
+        </div>
+        <div class="faq-a">Yes. The daemon and extension communicate over <code>localhost</code> only. No browser data, login sessions, cookies, or page content ever leaves your machine. The daemon is not accessible from external networks. QWebBridge is fully self-hosted and open source — you control everything.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" role="button" tabindex="0" onclick="toggleFaq(this)" onkeydown="if(event.key==='Enter')toggleFaq(this)">
+          How do I build from source?
+          <span class="arrow">▾</span>
+        </div>
+        <div class="faq-a">Clone the repo, run <code>pnpm install && pnpm build</code>, then start with <code>node packages/daemon/dist/cli.js run</code>. Load the extension from <code>packages/extension/dist</code> in Chrome via <code>chrome://extensions</code> with Developer mode enabled. See the install section above for step-by-step instructions.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" role="button" tabindex="0" onclick="toggleFaq(this)" onkeydown="if(event.key==='Enter')toggleFaq(this)">
+          Do I only need the Chrome extension?
+          <span class="arrow">▾</span>
+        </div>
+        <div class="faq-a">No. The Chrome extension is the browser-side component. To use QWebBridge with an AI agent, also start the local daemon with <code>qweb-bridge start</code> and install the agent skill with <code>qweb-bridge install-skill</code>. The full chain is: AI Agent → Agent Skill → Local Daemon → Chrome Extension → Real Browser.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" role="button" tabindex="0" onclick="toggleFaq(this)" onkeydown="if(event.key==='Enter')toggleFaq(this)">
+          What permissions does the extension need?
+          <span class="arrow">▾</span>
+        </div>
+        <div class="faq-a">The extension requires <code>tabs</code>, <code>debugger</code>, <code>storage</code>, <code>alarms</code>, <code>tabGroups</code>, <code>windows</code>, and host permissions for <code>&lt;all_urls&gt;</code>. These are necessary for CDP-based browser control and tab management. All data stays local.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <span>
+    <a href="https://github.com/hu-qi/QWebBridge">QWebBridge</a>
+    &middot; Open source (MIT) &middot; Built by <a href="https://github.com/hu-qi">hu-qi</a>
+  </span>
+  <div class="socials">
+    <a href="https://github.com/hu-qi/QWebBridge" target="_blank">GitHub</a>
+    <a href="https://github.com/hu-qi/QWebBridge/issues" target="_blank">Issues</a>
+  </div>
+</footer>
+
+<script>
+// FAQ toggles
+function toggleFaq(el) {
+  el.parentElement.classList.toggle('open');
+}
+
+// Install tabs
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+// Copy to clipboard
+function copyText(el) {
+  const text = el.textContent.trim();
+  navigator.clipboard.writeText(text).then(() => {
+    const orig = el.textContent;
+    el.textContent = 'Copied!';
+    setTimeout(() => el.textContent = orig, 1500);
+  }).catch(() => {});
+}
+</script>
+
+</body>
+</html>
