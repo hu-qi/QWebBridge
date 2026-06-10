@@ -17,11 +17,27 @@ interface GetFullAXTreeResult {
 export const snapshotTool: ToolExecutor = {
   name: "snapshot",
   async execute(_params, ctx) {
-    await ctx.cdp.attach(await getTabId(_params, ctx));
+    const tabId = await getTabId(_params, ctx);
+    if (tabId === undefined || tabId === null) {
+      throw new Error("snapshot: getTabId returned invalid: " + JSON.stringify({_params, tabId}));
+    }
+    try {
+      await ctx.cdp.attach(tabId);
+    } catch (e) {
+      throw new Error(`snapshot: attach failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
 
-    const result = await ctx.cdp.send<GetFullAXTreeResult>(
-      "Accessibility.getFullAXTree"
-    );
+    let result: GetFullAXTreeResult;
+    try {
+      await ctx.cdp.send("Accessibility.enable");
+    } catch {}
+    try {
+      result = await ctx.cdp.send<GetFullAXTreeResult>(
+        "Accessibility.getFullAXTree"
+      );
+    } catch (e) {
+      throw new Error(`snapshot CDP error: ${e instanceof Error ? e.message : String(e)}`);
+    }
 
     ctx.refs.clear();
     let refIndex = 0;

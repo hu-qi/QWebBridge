@@ -29,6 +29,14 @@ let ws: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let handshakeDone = false;
 
+function sendIfOpen(data: string): boolean {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(data);
+    return true;
+  }
+  return false;
+}
+
 // Support custom daemon URL from storage (set via popup dev settings)
 try {
   chrome.storage.local.get("daemonUrl", (result) => {
@@ -37,7 +45,7 @@ try {
 } catch {}
 
 function connect(): void {
-  if (ws && ws.readyState === WebSocket.OPEN) return;
+  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
 
   try {
     ws = new WebSocket(WS_URL);
@@ -68,7 +76,7 @@ function connect(): void {
         const tool = getTool(cmd.tool);
 
         if (!tool) {
-          ws!.send(JSON.stringify({
+          sendIfOpen(JSON.stringify({
             id: msg.id,
             type: "error",
             payload: { code: ERROR_CODES.TOOL_NOT_FOUND, message: `Unknown tool: ${cmd.tool}` },
@@ -78,14 +86,14 @@ function connect(): void {
 
         try {
           const result = await tool.execute(cmd.params, { cdp, refs });
-          ws!.send(JSON.stringify({
+          sendIfOpen(JSON.stringify({
             id: msg.id,
             type: "tool_result",
             payload: { result },
           }));
         } catch (err) {
           const message = err instanceof Error ? err.message : "Unknown error";
-          ws!.send(JSON.stringify({
+          sendIfOpen(JSON.stringify({
             id: msg.id,
             type: "error",
             payload: { code: ERROR_CODES.EXECUTION_ERROR, message },
