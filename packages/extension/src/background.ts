@@ -57,7 +57,7 @@ function connect(): void {
         JSON.stringify({
           id: "extension-hello",
           type: "hello",
-          payload: { agent: "extension", version: "1.0.0", extension_id: chrome.runtime.id },
+          payload: { agent: "extension", version: "1.0.1", extension_id: chrome.runtime.id },
         }),
       );
       notifyPopup(true);
