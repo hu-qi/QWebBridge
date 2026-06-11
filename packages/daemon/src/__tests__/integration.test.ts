@@ -86,4 +86,57 @@ describe("Daemon Integration", () => {
     agentWs.close();
     extWs.close();
   });
+
+  it("should handle HTTP batch requests with per-item results", async () => {
+    const extWs = new WebSocket(WS_URL);
+    await new Promise<void>((resolve) => {
+      extWs.on("open", () => {
+        extWs.send(
+          JSON.stringify({
+            id: "ext-batch",
+            type: "hello",
+            payload: { agent: "extension" },
+          }),
+        );
+      });
+      extWs.on("message", () => resolve());
+    });
+
+    extWs.on("message", (data: Buffer) => {
+      const msg = JSON.parse(data.toString());
+      if (msg.type === "tool_call") {
+        extWs.send(
+          JSON.stringify({
+            id: msg.id,
+            type: "tool_result",
+            payload: { result: `ok:${msg.payload.params.code}` },
+          }),
+        );
+      }
+    });
+
+    const res = await fetch(`http://127.0.0.1:${TEST_PORT}/api/batch`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        requests: [
+          { tool: "evaluate", params: { code: "document.title" } },
+          { tool: "evaluate", params: { code: "location.href" } },
+        ],
+      }),
+    });
+    const body = (await res.json()) as {
+      success: boolean;
+      results: Array<{ success: boolean; result: string }>;
+    };
+
+    expect(res.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(body.results).toEqual([
+      { index: 0, tool: "evaluate", success: true, result: "ok:document.title" },
+      { index: 1, tool: "evaluate", success: true, result: "ok:location.href" },
+    ]);
+
+    extWs.close();
+  });
 });
