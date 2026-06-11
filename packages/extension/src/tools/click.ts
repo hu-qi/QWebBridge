@@ -16,14 +16,14 @@ const clickTool: ToolExecutor = {
 };
 
 async function getExecutionContextId(ctx: ToolContext): Promise<number> {
-  const result = await ctx.cdp.send<{ result: { type: string }; executionContextId?: number }>(
-    "Runtime.evaluate",
-    { expression: "1", returnByValue: true }
-  );
+  const result = await ctx.cdp.send<{ result: { type: string }; executionContextId?: number }>("Runtime.evaluate", {
+    expression: "1",
+    returnByValue: true,
+  });
   if (result.executionContextId) return result.executionContextId;
-  const contexts = await ctx.cdp.send<{ contexts: { id: number; origin: string; name: string }[] }>(
-    "Runtime.executionContexts"
-  ).catch(() => ({ contexts: [] }));
+  const contexts = await ctx.cdp
+    .send<{ contexts: { id: number; origin: string; name: string }[] }>("Runtime.executionContexts")
+    .catch(() => ({ contexts: [] }));
   const pageCtx = contexts.contexts?.find((c: { origin: string; name: string }) => !c.origin.startsWith("chrome"));
   return pageCtx?.id ?? 1;
 }
@@ -52,7 +52,7 @@ async function clickByRef(ref: string, ctx: ToolContext): Promise<unknown> {
         return { success: true, tag: this.tagName, text: (this.textContent || '').slice(0, 100) };
       }`,
       returnByValue: true,
-    }
+    },
   );
 
   if (result.exceptionDetails) throw new Error(`click: ${result.exceptionDetails.text}`);
@@ -71,7 +71,7 @@ async function clickBySelector(selector: string, ctx: ToolContext): Promise<unkn
         return { success: true, tag: el.tagName, text: (el.textContent || '').slice(0, 100) };
       })()`,
       returnByValue: true,
-    }
+    },
   );
 
   if (result.exceptionDetails) throw new Error(`click: ${result.exceptionDetails.text}`);

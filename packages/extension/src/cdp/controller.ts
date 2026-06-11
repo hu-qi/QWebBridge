@@ -2,6 +2,7 @@ export class CDPController {
   private attachedTabs = new Set<number>();
   private currentTabId: number | null = null;
   private fallbackTabId: number | null = null;
+  private commandQueue: Promise<unknown> = Promise.resolve();
 
   async attach(tabId: number): Promise<void> {
     if (this.attachedTabs.has(tabId)) {
@@ -47,6 +48,16 @@ export class CDPController {
       }
       throw e;
     }
+  }
+
+  async runExclusive<T>(operation: () => Promise<T>): Promise<T> {
+    return this.enqueue(operation);
+  }
+
+  private enqueue<T>(operation: () => Promise<T>): Promise<T> {
+    const next = this.commandQueue.then(operation, operation);
+    this.commandQueue = next.catch(() => undefined);
+    return next;
   }
 
   private async ensureExecutionContext(tabId: number): Promise<void> {

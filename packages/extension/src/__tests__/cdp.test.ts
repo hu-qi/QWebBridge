@@ -35,17 +35,13 @@ describe("CDPController", () => {
   });
 
   it("should throw when sending without attached tab", async () => {
-    await expect(controller.send("Runtime.evaluate", { expression: "1+1" }))
-      .rejects.toThrow("No tab attached");
+    await expect(controller.send("Runtime.evaluate", { expression: "1+1" })).rejects.toThrow("No tab attached");
   });
 
   it("should send CDP commands", async () => {
     mockDebuggerSend.mockResolvedValue({ result: { value: 42 } });
     await controller.attach(42);
-    const result = await controller.send<{ result: { value: number } }>(
-      "Runtime.evaluate",
-      { expression: "40+2" }
-    );
+    const result = await controller.send<{ result: { value: number } }>("Runtime.evaluate", { expression: "40+2" });
     expect(result.result.value).toBe(42);
     expect(mockDebuggerSend).toHaveBeenCalledWith("Runtime.evaluate", { expression: "40+2" });
   });
@@ -60,5 +56,23 @@ describe("CDPController", () => {
     mockTabsQuery.mockResolvedValue([{ id: 99, url: "https://example.com" }]);
     const tab = await controller.getActiveTab();
     expect(tab.id).toBe(99);
+  });
+
+  it("should run exclusive operations sequentially", async () => {
+    const order: string[] = [];
+
+    await Promise.all([
+      controller.runExclusive(async () => {
+        order.push("first:start");
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        order.push("first:end");
+      }),
+      controller.runExclusive(async () => {
+        order.push("second:start");
+        order.push("second:end");
+      }),
+    ]);
+
+    expect(order).toEqual(["first:start", "first:end", "second:start", "second:end"]);
   });
 });

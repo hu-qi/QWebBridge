@@ -17,9 +17,22 @@ export interface SnapshotElement {
   name?: string;
   value?: string;
   ref: string;
+  truncated?: boolean;
   children?: SnapshotElement[];
 }
+export interface SnapshotParams {
+  roles?: string[];
+  name_contains?: string;
+  depth?: number;
+  interactive_only?: boolean;
+}
 export type SnapshotResult = SnapshotElement[];
+export interface MultiSnapshotParams extends SnapshotParams {
+  tabIds: number[];
+}
+export interface MultiSnapshotResult {
+  results: Array<{ tabId: number; tree?: SnapshotResult; error?: string }>;
+}
 
 // === Screenshot ===
 export interface ScreenshotParams {
@@ -49,18 +62,55 @@ export interface ClickResult {
 export interface FillParams {
   selector: string;
   value: string;
+  submit?: boolean;
 }
 export interface FillResult {
   success: boolean;
   tag: string;
   mode: "value" | "contenteditable";
+  submitted?: boolean;
 }
 
 // === Evaluate ===
 export interface EvaluateParams {
   code: string;
+  parse_json?: boolean;
+  structured?: boolean;
 }
 export type EvaluateResult = unknown;
+export interface BatchEvalParams extends EvaluateParams {
+  tabIds: number[];
+}
+export interface BatchEvalResult {
+  results: Array<{ tabId: number; value?: unknown; error?: string }>;
+}
+
+// === WaitFor ===
+export interface WaitForParams {
+  selector: string;
+  text?: string;
+  state?: "visible" | "hidden" | "removed";
+  timeout?: number;
+}
+export interface WaitForResult {
+  success: boolean;
+  found: boolean;
+  ref?: string;
+  elapsed_ms: number;
+  error?: string;
+}
+
+// === StreamingStatus ===
+export interface StreamingStatusParams {
+  selector?: string;
+}
+export interface StreamingStatusResult {
+  success: boolean;
+  isStreaming: boolean;
+  hasPendingAuth: boolean;
+  url: string;
+  title: string;
+}
 
 // === MouseClick ===
 export interface MouseClickParams {
@@ -172,10 +222,15 @@ export interface SaveAsPdfResult {
 // === Tool params/result union ===
 export type ToolParams =
   | NavigateParams
+  | SnapshotParams
+  | MultiSnapshotParams
   | ScreenshotParams
   | ClickParams
   | FillParams
   | EvaluateParams
+  | BatchEvalParams
+  | WaitForParams
+  | StreamingStatusParams
   | MouseClickParams
   | KeyTypeParams
   | SendKeysParams
@@ -191,10 +246,14 @@ export type ToolParams =
 export type ToolResult =
   | NavigateResult
   | SnapshotResult
+  | MultiSnapshotResult
   | ScreenshotResult
   | ClickResult
   | FillResult
   | EvaluateResult
+  | BatchEvalResult
+  | WaitForResult
+  | StreamingStatusResult
   | MouseClickResult
   | KeyTypeResult
   | SendKeysResult

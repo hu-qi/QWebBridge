@@ -14,12 +14,74 @@ interface GetFullAXTreeResult {
   nodes: AXNode[];
 }
 
+const INTERACTIVE_ROLES = new Set([
+  "button",
+  "checkbox",
+  "combobox",
+  "link",
+  "menuitem",
+  "option",
+  "radio",
+  "searchbox",
+  "slider",
+  "spinbutton",
+  "switch",
+  "tab",
+  "textbox",
+]);
+
+function filterSnapshotTree(roots: SnapshotElement[], params: Record<string, unknown>): SnapshotElement[] {
+  const roles = Array.isArray(params.roles)
+    ? new Set(params.roles.filter((role): role is string => typeof role === "string"))
+    : null;
+  const nameContains = typeof params.name_contains === "string" ? params.name_contains.toLowerCase() : "";
+  const maxDepth = typeof params.depth === "number" && params.depth >= 0 ? params.depth : null;
+  const interactiveOnly = params.interactive_only === true;
+
+  if (!roles && !nameContains && maxDepth === null && !interactiveOnly) return roots;
+
+  function matches(element: SnapshotElement): boolean {
+    if (roles && !roles.has(element.role)) return false;
+    if (interactiveOnly && !INTERACTIVE_ROLES.has(element.role)) return false;
+    if (nameContains && !(element.name || "").toLowerCase().includes(nameContains)) return false;
+    return true;
+  }
+
+  function visit(element: SnapshotElement, depth: number): SnapshotElement | null {
+    const atLimit = maxDepth !== null && depth >= maxDepth;
+    const children = atLimit
+      ? []
+      : (element.children || [])
+          .map((child) => visit(child, depth + 1))
+          .filter((child): child is SnapshotElement => child !== null);
+    const selfMatches = matches(element);
+
+    if (!selfMatches && children.length === 0) return null;
+
+    const next: SnapshotElement = {
+      role: element.role,
+      name: element.name,
+      value: element.value,
+      ref: element.ref,
+    };
+    if (children.length > 0) {
+      next.children = children;
+    }
+    if (atLimit && (element.children?.length || 0) > 0) {
+      next.truncated = true;
+    }
+    return next;
+  }
+
+  return roots.map((root) => visit(root, 0)).filter((root): root is SnapshotElement => root !== null);
+}
+
 export const snapshotTool: ToolExecutor = {
   name: "snapshot",
-  async execute(_params, ctx) {
-    const tabId = await getTabId(_params, ctx);
+  async execute(params, ctx) {
+    const tabId = await getTabId(params, ctx);
     if (tabId === undefined || tabId === null) {
-      throw new Error("snapshot: getTabId returned invalid: " + JSON.stringify({_params, tabId}));
+      throw new Error("snapshot: getTabId returned invalid: " + JSON.stringify({ params, tabId }));
     }
     try {
       await ctx.cdp.attach(tabId);
@@ -32,9 +94,7 @@ export const snapshotTool: ToolExecutor = {
       await ctx.cdp.send("Accessibility.enable");
     } catch {}
     try {
-      result = await ctx.cdp.send<GetFullAXTreeResult>(
-        "Accessibility.getFullAXTree"
-      );
+      result = await ctx.cdp.send<GetFullAXTreeResult>("Accessibility.getFullAXTree");
     } catch (e) {
       throw new Error(`snapshot CDP error: ${e instanceof Error ? e.message : String(e)}`);
     }
@@ -50,11 +110,7 @@ export const snapshotTool: ToolExecutor = {
     function buildElement(node: AXNode): SnapshotElement | null {
       const role = node.role?.value || "";
 
-      if (
-        (role === "none" || role === "generic") &&
-        node.childIds &&
-        node.childIds.length > 0
-      ) {
+      if ((role === "none" || role === "generic") && node.childIds && node.childIds.length > 0) {
         const children: SnapshotElement[] = [];
         for (const childId of node.childIds) {
           const child = nodeMap.get(childId);
@@ -113,7 +169,7 @@ export const snapshotTool: ToolExecutor = {
       }
     }
 
-    return roots;
+    return filterSnapshotTree(roots, params);
   },
 };
 

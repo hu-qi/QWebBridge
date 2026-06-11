@@ -1,22 +1,33 @@
 import { describe, it, expect } from "vitest";
 import { TOOL_NAMES, ERROR_CODES, DAEMON_PORT, WS_PATH } from "../constants.js";
-import type { Message, ToolCallPayload, ToolResultPayload, ErrorDetail, HelloPayload, HelloAckPayload } from "../types.js";
+import type {
+  Message,
+  ToolCallPayload,
+  ToolResultPayload,
+  ErrorDetail,
+  HelloPayload,
+  HelloAckPayload,
+} from "../types.js";
 
 describe("Constants", () => {
-  it("should have exactly 16 tool names", () => {
-    expect(TOOL_NAMES).toHaveLength(16);
+  it("should have exactly 20 tool names", () => {
+    expect(TOOL_NAMES).toHaveLength(20);
   });
 
   it("should have all required tool names", () => {
     expect(TOOL_NAMES).toContain("navigate");
     expect(TOOL_NAMES).toContain("snapshot");
+    expect(TOOL_NAMES).toContain("multi_snapshot");
     expect(TOOL_NAMES).toContain("screenshot");
     expect(TOOL_NAMES).toContain("click");
     expect(TOOL_NAMES).toContain("fill");
     expect(TOOL_NAMES).toContain("evaluate");
+    expect(TOOL_NAMES).toContain("batch_eval");
     expect(TOOL_NAMES).toContain("mouse_click");
     expect(TOOL_NAMES).toContain("key_type");
     expect(TOOL_NAMES).toContain("send_keys");
+    expect(TOOL_NAMES).toContain("wait_for");
+    expect(TOOL_NAMES).toContain("streaming_status");
     expect(TOOL_NAMES).toContain("upload");
     expect(TOOL_NAMES).toContain("network");
     expect(TOOL_NAMES).toContain("find_tab");

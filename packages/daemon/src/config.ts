@@ -65,7 +65,11 @@ export function removePid(): void {
     if (existsSync(PID_FILE)) {
       const pid = readPid();
       if (pid) {
-        try { process.kill(pid, 0); } catch { /* not running, safe to remove */ }
+        try {
+          process.kill(pid, 0);
+        } catch {
+          /* not running, safe to remove */
+        }
       }
     }
   } catch {}

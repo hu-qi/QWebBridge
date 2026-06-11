@@ -50,8 +50,6 @@ describe("SessionManager", () => {
   });
 
   it("should throw when sending to extension with no connection", async () => {
-    await expect(sm.sendToExtension({ id: "test" })).rejects.toThrow(
-      "no_extension_connected"
-    );
+    await expect(sm.sendToExtension({ id: "test" })).rejects.toThrow("no_extension_connected");
   });
 });

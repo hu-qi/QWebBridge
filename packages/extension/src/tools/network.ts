@@ -28,11 +28,7 @@ const cdpNetwork: ToolExecutor = {
         requests.clear();
         await ctx.cdp.send("Network.enable");
 
-        networkHandler = (
-          source: chrome.debugger.Debuggee,
-          method: string,
-          params?: object
-        ) => {
+        networkHandler = (source: chrome.debugger.Debuggee, method: string, params?: object) => {
           if (source.tabId !== ctx.cdp.getCurrentTabId()) return;
 
           if (method === "Network.requestWillBeSent") {
@@ -94,10 +90,9 @@ const cdpNetwork: ToolExecutor = {
         if (!req) throw new Error(`network: request ${requestId} not found`);
 
         try {
-          const bodyResult = await ctx.cdp.send<{ body: string; base64Encoded: boolean }>(
-            "Network.getResponseBody",
-            { requestId }
-          );
+          const bodyResult = await ctx.cdp.send<{ body: string; base64Encoded: boolean }>("Network.getResponseBody", {
+            requestId,
+          });
           req.responseBody = bodyResult.base64Encoded
             ? Buffer.from(bodyResult.body, "base64").toString("utf-8")
             : bodyResult.body;
