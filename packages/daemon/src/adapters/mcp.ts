@@ -64,7 +64,7 @@ export function createMCPAdapter(sessionManager: SessionManager): void {
               result: {
                 protocolVersion: "2024-11-05",
                 capabilities: { tools: {} },
-                serverInfo: { name: "qweb-bridge", version: "1.0.0" },
+                serverInfo: { name: "qweb-bridge", version: "1.0.1" },
               },
             };
             process.stdout.write(JSON.stringify(res) + "\n");

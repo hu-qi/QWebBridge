@@ -42,7 +42,7 @@ export function handleHttpRequest(
       JSON.stringify({
         running: true,
         port: DAEMON_PORT,
-        version: "1.0.0",
+        version: "1.0.1",
         uptime_seconds: uptime,
         extensions_connected: sessionManager.hasExtension(),
         extension_version: sessionManager.getExtensionVersion(),

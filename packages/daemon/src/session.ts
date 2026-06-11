@@ -63,6 +63,7 @@ export class SessionManager {
     });
 
     ws.on("close", () => {
+      if (this.extensionConnection !== ws) return;
       this.extensionConnection = null;
       this.extensionVersion = null;
       this.extensionId = null;
