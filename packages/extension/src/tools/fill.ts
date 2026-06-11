@@ -21,12 +21,14 @@ function fillScript(targetExpr: string, value: string): string {
       }
       if (!__inserted) {
         __target.textContent = ${n};
-        __target.dispatchEvent(new InputEvent('input', {
-          inputType: 'insertText',
-          data: ${n},
-          bubbles: true,
-        }));
       }
+      __target.dispatchEvent(new InputEvent('input', {
+        inputType: 'insertText',
+        data: ${n},
+        bubbles: true,
+        composed: true,
+      }));
+      __target.dispatchEvent(new Event('change', { bubbles: true }));
       return { success: true, tag: __target.tagName, mode: 'contenteditable' };
     }
     const __proto = __target.tagName === 'TEXTAREA' ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype;

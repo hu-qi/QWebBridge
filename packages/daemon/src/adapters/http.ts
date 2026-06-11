@@ -21,6 +21,11 @@ function errorMessage(code: string): string {
   return code;
 }
 
+interface BatchToolRequest {
+  tool: string;
+  params?: Record<string, unknown>;
+}
+
 export function handleHttpRequest(
   req: IncomingMessage,
   res: ServerResponse,
@@ -44,6 +49,68 @@ export function handleHttpRequest(
         extension_id: sessionManager.getExtensionId() || "",
       }),
     );
+    return true;
+  }
+
+  // Batch Tool API: POST /api/batch
+  if (url.pathname === "/api/batch" && req.method === "POST") {
+    let body = "";
+    req.on("data", (chunk) => {
+      body += chunk;
+    });
+    req.on("end", async () => {
+      try {
+        const params = body ? (JSON.parse(body) as { requests?: BatchToolRequest[] }) : {};
+        const requests = params.requests;
+        if (!Array.isArray(requests) || requests.length === 0) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({ success: false, error: "invalid_params", message: "requests must be a non-empty array" }),
+          );
+          return;
+        }
+
+        const invalid = requests.find((request) => !request || !isToolName(request.tool));
+        if (invalid) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({
+              success: false,
+              error: "unknown_tool",
+              message: `Unknown tool: ${invalid?.tool}`,
+              available_tools: TOOL_NAMES,
+            }),
+          );
+          return;
+        }
+
+        const results = await Promise.all(
+          requests.map(async (request, index) => {
+            const id = `http-batch-${Date.now()}-${index}`;
+            const commandMsg = {
+              id,
+              type: "tool_call" as const,
+              payload: { tool: request.tool, params: request.params ?? {} },
+            };
+
+            try {
+              const result = await sessionManager.sendToExtension(commandMsg);
+              return { index, tool: request.tool, success: true, result };
+            } catch (err) {
+              const code = err instanceof Error ? err.message : "unknown_error";
+              return { index, tool: request.tool, success: false, error: code, message: errorMessage(code) };
+            }
+          }),
+        );
+
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ success: true, results }));
+      } catch (err) {
+        const code = err instanceof Error ? err.message : "unknown_error";
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ success: false, error: code, message: errorMessage(code) }));
+      }
+    });
     return true;
   }
 
