@@ -42,11 +42,28 @@ function fillScript(targetExpr: string, value: string): string {
   `;
 }
 
+function submitScript(targetExpr: string): string {
+  return `
+    const __submitTarget = ${targetExpr};
+    const __keyboardOptions = {
+      key: 'Enter',
+      code: 'Enter',
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+    };
+    __submitTarget.dispatchEvent(new KeyboardEvent('keydown', __keyboardOptions));
+    __submitTarget.dispatchEvent(new KeyboardEvent('keypress', __keyboardOptions));
+    __submitTarget.dispatchEvent(new KeyboardEvent('keyup', __keyboardOptions));
+  `;
+}
+
 const fillTool: ToolExecutor = {
   name: "fill",
   async execute(params, ctx) {
     const selector = params.selector as string;
     const value = params.value as string;
+    const submit = params.submit === true;
     if (!selector) throw new Error("fill: selector is required");
     if (value == null) throw new Error("fill: value is required");
 
@@ -57,7 +74,10 @@ const fillTool: ToolExecutor = {
       const entry = ctx.refs.get(refName);
       if (!entry) throw new Error(`fill: unknown ref "${selector}"`);
 
-      const evalCtx = await ctx.cdp.send<{ executionContextId?: number }>("Runtime.evaluate", { expression: "1", returnByValue: true });
+      const evalCtx = await ctx.cdp.send<{ executionContextId?: number }>("Runtime.evaluate", {
+        expression: "1",
+        returnByValue: true,
+      });
       const { object } = await ctx.cdp.send<{ object: { objectId: string } }>("DOM.resolveNode", {
         backendNodeId: entry.backendDOMNodeId,
         executionContextId: evalCtx.executionContextId ?? 1,
@@ -68,9 +88,13 @@ const fillTool: ToolExecutor = {
         "Runtime.callFunctionOn",
         {
           objectId: object.objectId,
-          functionDeclaration: `function() { ${fillScript("this", value)} }`,
+          functionDeclaration: `function() {
+            const __result = (() => { ${fillScript("this", value)} })();
+            ${submit ? submitScript("this") : ""}
+            return { ...__result, submitted: ${JSON.stringify(submit)} };
+          }`,
           returnByValue: true,
-        }
+        },
       );
       if (result.exceptionDetails) throw new Error(`fill: ${result.exceptionDetails.text}`);
       return result.result.value || { success: true };
@@ -81,10 +105,12 @@ const fillTool: ToolExecutor = {
           expression: `(() => {
             const el = document.querySelector(${JSON.stringify(selector)});
             if (!el) return { error: 'element not found: ${selector}' };
-            ${fillScript("el", value)}
+            const result = (() => { ${fillScript("el", value)} })();
+            ${submit ? submitScript("el") : ""}
+            return { ...result, submitted: ${JSON.stringify(submit)} };
           })()`,
           returnByValue: true,
-        }
+        },
       );
       if (result.exceptionDetails) throw new Error(`fill: ${result.exceptionDetails.text}`);
       const val = result.result.value as { error?: string; success?: boolean; tag?: string; mode?: string };

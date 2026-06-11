@@ -38,11 +38,7 @@ function pickColor(sessionName: string): string {
   return PREDEFINED_COLORS[sessionName] ?? FALLBACK_COLORS[colorIndex++ % FALLBACK_COLORS.length];
 }
 
-export async function groupTab(
-  tabIds: number | number[],
-  sessionName: string,
-  groupTitle?: string
-): Promise<void> {
+export async function groupTab(tabIds: number | number[], sessionName: string, groupTitle?: string): Promise<void> {
   const ids = Array.isArray(tabIds) ? tabIds : [tabIds];
   const existingGroup = sessionGroups.get(sessionName);
 
@@ -65,7 +61,11 @@ export async function groupTab(
   const displayTitle = groupTitle ?? title;
 
   const groupId = await chrome.tabs.group({ tabIds: ids });
-  await chrome.tabGroups.update(groupId, { title: displayTitle, color: color as chrome.tabGroups.ColorEnum, collapsed: false });
+  await chrome.tabGroups.update(groupId, {
+    title: displayTitle,
+    color: color as chrome.tabGroups.ColorEnum,
+    collapsed: false,
+  });
   sessionGroups.set(sessionName, groupId);
 }
 

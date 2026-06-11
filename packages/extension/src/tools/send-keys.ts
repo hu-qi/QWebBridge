@@ -27,13 +27,16 @@ registerTool({
 
     const parts = keys.split("+");
     const keyName = parts[parts.length - 1];
-    const modifiers = parts.length > 1 ? parts.slice(0, -1).reduce((mod, m) => {
-      if (m === "Control" || m === "Ctrl") mod += 2;
-      if (m === "Alt") mod += 1;
-      if (m === "Shift") mod += 8;
-      if (m === "Meta" || m === "Command") mod += 4;
-      return mod;
-    }, 0) : 0;
+    const modifiers =
+      parts.length > 1
+        ? parts.slice(0, -1).reduce((mod, m) => {
+            if (m === "Control" || m === "Ctrl") mod += 2;
+            if (m === "Alt") mod += 1;
+            if (m === "Shift") mod += 8;
+            if (m === "Meta" || m === "Command") mod += 4;
+            return mod;
+          }, 0)
+        : 0;
 
     const keyDef = KEY_MAP[keyName] || { code: keyName, key: keyName.toLowerCase(), text: keyName.toLowerCase() };
 

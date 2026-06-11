@@ -17,20 +17,19 @@ registerTool({
       const refName = selector.startsWith("@") ? selector.slice(1) : selector;
       const entry = ctx.refs.get(refName);
       if (!entry) throw new Error(`upload: unknown ref "${selector}"`);
-      const result = await ctx.cdp.send<{ nodeIds: number[] }>(
-        "DOM.pushNodesByBackendIdsToFrontend",
-        { backendNodeIds: [entry.backendDOMNodeId] }
-      );
+      const result = await ctx.cdp.send<{ nodeIds: number[] }>("DOM.pushNodesByBackendIdsToFrontend", {
+        backendNodeIds: [entry.backendDOMNodeId],
+      });
       if (!result.nodeIds || result.nodeIds.length === 0) {
         throw new Error("upload: could not resolve ref to nodeId");
       }
       nodeId = result.nodeIds[0];
     } else {
       const docResult = await ctx.cdp.send<{ root: { nodeId: number } }>("DOM.getDocument");
-      const queryResult = await ctx.cdp.send<{ nodeId: number }>(
-        "DOM.querySelector",
-        { nodeId: docResult.root.nodeId, selector }
-      );
+      const queryResult = await ctx.cdp.send<{ nodeId: number }>("DOM.querySelector", {
+        nodeId: docResult.root.nodeId,
+        selector,
+      });
       if (!queryResult.nodeId || queryResult.nodeId === 0) {
         throw new Error(`upload: element not found: ${selector}`);
       }

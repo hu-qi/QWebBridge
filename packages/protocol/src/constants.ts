@@ -1,13 +1,17 @@
 export const TOOL_NAMES = [
   "navigate",
   "snapshot",
+  "multi_snapshot",
   "screenshot",
   "click",
   "fill",
   "evaluate",
+  "batch_eval",
   "mouse_click",
   "key_type",
   "send_keys",
+  "wait_for",
+  "streaming_status",
   "upload",
   "network",
   "find_tab",
@@ -48,11 +52,4 @@ export const TAB_GROUP_COLORS: Record<string, string> = {
   worldquant: "purple",
 };
 
-export const FALLBACK_COLORS = [
-  "green",
-  "yellow",
-  "cyan",
-  "orange",
-  "pink",
-  "grey",
-] as const;
+export const FALLBACK_COLORS = ["green", "yellow", "cyan", "orange", "pink", "grey"] as const;

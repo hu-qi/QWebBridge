@@ -11,8 +11,11 @@ import "./tools/click.js";
 import "./tools/mouse-click.js";
 import "./tools/fill.js";
 import "./tools/evaluate.js";
+import "./tools/batch.js";
 import "./tools/key-type.js";
 import "./tools/send-keys.js";
+import "./tools/wait-for.js";
+import "./tools/streaming-status.js";
 import "./tools/upload.js";
 import "./tools/network.js";
 import "./tools/tabs.js";
@@ -22,8 +25,6 @@ const cdp = new CDPController();
 const refs = new RefStore();
 const DAEMON_PORT = 10086;
 let WS_URL = `ws://127.0.0.1:${DAEMON_PORT}/selector/command`;
-
-
 
 let ws: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -52,11 +53,13 @@ function connect(): void {
 
     ws.onopen = () => {
       console.log("[QwebBridge] Connected to daemon");
-      ws!.send(JSON.stringify({
-        id: "extension-hello",
-        type: "hello",
-        payload: { agent: "extension", version: "1.0.0", extension_id: chrome.runtime.id },
-      }));
+      ws!.send(
+        JSON.stringify({
+          id: "extension-hello",
+          type: "hello",
+          payload: { agent: "extension", version: "1.0.0", extension_id: chrome.runtime.id },
+        }),
+      );
       notifyPopup(true);
     };
 
@@ -76,28 +79,34 @@ function connect(): void {
         const tool = getTool(cmd.tool);
 
         if (!tool) {
-          sendIfOpen(JSON.stringify({
-            id: msg.id,
-            type: "error",
-            payload: { code: ERROR_CODES.TOOL_NOT_FOUND, message: `Unknown tool: ${cmd.tool}` },
-          }));
+          sendIfOpen(
+            JSON.stringify({
+              id: msg.id,
+              type: "error",
+              payload: { code: ERROR_CODES.TOOL_NOT_FOUND, message: `Unknown tool: ${cmd.tool}` },
+            }),
+          );
           return;
         }
 
         try {
-          const result = await tool.execute(cmd.params, { cdp, refs });
-          sendIfOpen(JSON.stringify({
-            id: msg.id,
-            type: "tool_result",
-            payload: { result },
-          }));
+          const result = await cdp.runExclusive(() => tool.execute(cmd.params, { cdp, refs }));
+          sendIfOpen(
+            JSON.stringify({
+              id: msg.id,
+              type: "tool_result",
+              payload: { result },
+            }),
+          );
         } catch (err) {
           const message = err instanceof Error ? err.message : "Unknown error";
-          sendIfOpen(JSON.stringify({
-            id: msg.id,
-            type: "error",
-            payload: { code: ERROR_CODES.EXECUTION_ERROR, message },
-          }));
+          sendIfOpen(
+            JSON.stringify({
+              id: msg.id,
+              type: "error",
+              payload: { code: ERROR_CODES.EXECUTION_ERROR, message },
+            }),
+          );
         }
       } catch {
         // Ignore parse errors
@@ -132,7 +141,9 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
   if (request.type === "SET_DAEMON_URL" && request.url) {
     WS_URL = request.url;
     chrome.storage.local.set({ daemonUrl: request.url }).catch(() => {});
-    if (ws) { ws.close(); }
+    if (ws) {
+      ws.close();
+    }
     connect();
   }
   return true; // Keep message channel open for async response

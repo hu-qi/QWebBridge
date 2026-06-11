@@ -149,11 +149,17 @@ async function main() {
         const data = await res.json();
         console.log(JSON.stringify(data, null, 2));
       } catch {
-        console.log(JSON.stringify({
-          running: false,
-          port: DAEMON_PORT,
-          version: VERSION,
-        }, null, 2));
+        console.log(
+          JSON.stringify(
+            {
+              running: false,
+              port: DAEMON_PORT,
+              version: VERSION,
+            },
+            null,
+            2,
+          ),
+        );
       }
       process.exit(0);
     }
@@ -216,7 +222,10 @@ async function main() {
       ];
       let skillSource = "";
       for (const c of candidates) {
-        if (existsSync(join(c, "SKILL.md"))) { skillSource = c; break; }
+        if (existsSync(join(c, "SKILL.md"))) {
+          skillSource = c;
+          break;
+        }
       }
 
       let installed = false;
@@ -306,9 +315,9 @@ _arguments "1: :(start stop restart status run shutdown logs install install-ski
       console.log("[qweb-bridge] Checking for updates...");
       try {
         const res = await fetch("https://api.github.com/repos/hu-qi/QWebBridge/releases/latest", {
-          headers: { "Accept": "application/vnd.github.v3+json", "User-Agent": "qweb-bridge" },
+          headers: { Accept: "application/vnd.github.v3+json", "User-Agent": "qweb-bridge" },
         });
-        const data = await res.json() as { tag_name?: string; html_url?: string };
+        const data = (await res.json()) as { tag_name?: string; html_url?: string };
         const latest = data.tag_name || "";
         const cleaned = latest.replace(/^v/, "");
         if (cleaned && cleaned > VERSION) {
@@ -354,8 +363,14 @@ _arguments "1: :(start stop restart status run shutdown logs install install-ski
       const { createMCPAdapter } = await import("../adapters/mcp.js");
       createMCPAdapter(sm);
 
-      process.on("SIGINT", () => { httpServer.close(); process.exit(0); });
-      process.on("SIGTERM", () => { httpServer.close(); process.exit(0); });
+      process.on("SIGINT", () => {
+        httpServer.close();
+        process.exit(0);
+      });
+      process.on("SIGTERM", () => {
+        httpServer.close();
+        process.exit(0);
+      });
       break;
     }
 

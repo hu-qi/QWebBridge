@@ -37,11 +37,13 @@ describe("WebSocket Server", () => {
 
     await new Promise<void>((resolve) => {
       ws.on("open", () => {
-        ws.send(JSON.stringify({
-          id: "1",
-          type: "hello",
-          payload: { agent: "test-agent" },
-        }));
+        ws.send(
+          JSON.stringify({
+            id: "1",
+            type: "hello",
+            payload: { agent: "test-agent" },
+          }),
+        );
       });
 
       ws.on("message", (data: Buffer) => {
@@ -59,11 +61,13 @@ describe("WebSocket Server", () => {
 
     await new Promise<void>((resolve) => {
       ws.on("open", () => {
-        ws.send(JSON.stringify({
-          id: "2",
-          type: "tool_call",
-          payload: { tool: "navigate", params: { url: "https://example.com" } },
-        }));
+        ws.send(
+          JSON.stringify({
+            id: "2",
+            type: "tool_call",
+            payload: { tool: "navigate", params: { url: "https://example.com" } },
+          }),
+        );
       });
 
       ws.on("message", (data: Buffer) => {
@@ -74,5 +78,19 @@ describe("WebSocket Server", () => {
         resolve();
       });
     });
+  });
+
+  it("should return a clear HTTP error when extension is not connected", async () => {
+    const res = await fetch(`http://127.0.0.1:${TEST_PORT}/api/tool/snapshot`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const body = (await res.json()) as { success: boolean; error: string; message: string };
+
+    expect(res.status).toBe(500);
+    expect(body.success).toBe(false);
+    expect(body.error).toBe("no_extension_connected");
+    expect(body.message).toContain("Chrome extension is not connected");
   });
 });

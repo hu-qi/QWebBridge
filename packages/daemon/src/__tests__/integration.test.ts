@@ -26,11 +26,13 @@ describe("Daemon Integration", () => {
     const extWs = new WebSocket(WS_URL);
     await new Promise<void>((resolve) => {
       extWs.on("open", () => {
-        extWs.send(JSON.stringify({
-          id: "ext-1",
-          type: "hello",
-          payload: { agent: "extension" },
-        }));
+        extWs.send(
+          JSON.stringify({
+            id: "ext-1",
+            type: "hello",
+            payload: { agent: "extension" },
+          }),
+        );
       });
       extWs.on("message", () => resolve());
     });
@@ -39,11 +41,13 @@ describe("Daemon Integration", () => {
     const agentWs = new WebSocket(WS_URL);
     await new Promise<void>((resolve) => {
       agentWs.on("open", () => {
-        agentWs.send(JSON.stringify({
-          id: "agent-1",
-          type: "hello",
-          payload: { agent: "test" },
-        }));
+        agentWs.send(
+          JSON.stringify({
+            id: "agent-1",
+            type: "hello",
+            payload: { agent: "test" },
+          }),
+        );
       });
       agentWs.on("message", () => resolve());
     });
@@ -52,21 +56,25 @@ describe("Daemon Integration", () => {
     extWs.on("message", (data: Buffer) => {
       const msg = JSON.parse(data.toString());
       if (msg.type === "tool_call") {
-        extWs.send(JSON.stringify({
-          id: msg.id,
-          type: "tool_result",
-          payload: { result: { success: true, url: "https://example.com", tabId: 42 } },
-        }));
+        extWs.send(
+          JSON.stringify({
+            id: msg.id,
+            type: "tool_result",
+            payload: { result: { success: true, url: "https://example.com", tabId: 42 } },
+          }),
+        );
       }
     });
 
     // Agent sends tool_call and receives tool_result
     const response = await new Promise<{ type: string }>((resolve) => {
-      agentWs.send(JSON.stringify({
-        id: "cmd-1",
-        type: "tool_call",
-        payload: { tool: "navigate", params: { url: "https://example.com" } },
-      }));
+      agentWs.send(
+        JSON.stringify({
+          id: "cmd-1",
+          type: "tool_call",
+          payload: { tool: "navigate", params: { url: "https://example.com" } },
+        }),
+      );
       agentWs.on("message", (data: Buffer) => {
         const msg = JSON.parse(data.toString());
         if (msg.id === "cmd-1") resolve(msg);

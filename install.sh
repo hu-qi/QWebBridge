@@ -22,6 +22,7 @@ BIN_DIR="$INSTALL_DIR/bin"
 REPO_DIR="$INSTALL_DIR/repo"
 SKILL_DIR="$INSTALL_DIR/skill"
 VERSION="${QWEB_VERSION:-latest}"
+MIN_NODE_VERSION="18.0.0"
 
 if [ -t 1 ]; then
   B=$'\033[1m'; G=$'\033[32m'; Y=$'\033[33m'; R=$'\033[31m'; N=$'\033[0m'
@@ -33,6 +34,22 @@ info() { printf "%s==>%s %s\n" "$B" "$N" "$*"; }
 ok()   { printf "%s✓%s %s\n" "$G" "$N" "$*"; }
 warn() { printf "%s!%s %s\n" "$Y" "$N" "$*" >&2; }
 err()  { printf "%s✗%s %s\n" "$R" "$N" "$*" >&2; }
+
+version_ge() {
+  # Returns true when $1 >= $2 for dotted numeric versions.
+  local IFS=.
+  local i
+  local -a left right
+  read -r -a left <<< "${1#v}"
+  read -r -a right <<< "${2#v}"
+  for i in 0 1 2; do
+    local l="${left[$i]:-0}"
+    local r="${right[$i]:-0}"
+    if (( l > r )); then return 0; fi
+    if (( l < r )); then return 1; fi
+  done
+  return 0
+}
 
 show_help() {
   cat <<EOF
@@ -143,7 +160,12 @@ if [ "$USE_BINARY" -eq 0 ]; then
 
   NODE_VERSION=$(node --version 2>/dev/null || echo "none")
   if [ "$NODE_VERSION" = "none" ]; then
-    err "Node.js >= 18 is required"
+    err "Node.js >= $MIN_NODE_VERSION is required"
+    exit 1
+  fi
+  if ! version_ge "$NODE_VERSION" "$MIN_NODE_VERSION"; then
+    err "Node.js >= $MIN_NODE_VERSION is required, found $NODE_VERSION"
+    err "Please upgrade Node.js before installing QwebBridge."
     exit 1
   fi
   ok "Node.js $NODE_VERSION"

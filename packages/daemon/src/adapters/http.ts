@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "http";
 import type { SessionManager } from "../session.js";
-import { TOOL_NAMES, DAEMON_PORT } from "@qweb/protocol";
+import { TOOL_NAMES, DAEMON_PORT, ERROR_CODES } from "@qweb/protocol";
 
 type ToolName = (typeof TOOL_NAMES)[number];
 
@@ -8,11 +8,24 @@ function isToolName(name: string): name is ToolName {
   return (TOOL_NAMES as readonly string[]).includes(name);
 }
 
+function errorMessage(code: string): string {
+  if (code === ERROR_CODES.NO_EXTENSION_CONNECTED) {
+    return "Chrome extension is not connected. Please ensure the QwebBridge extension is installed and enabled.";
+  }
+  if (code === ERROR_CODES.EXTENSION_DISCONNECTED) {
+    return "Chrome extension disconnected before the request completed.";
+  }
+  if (code === ERROR_CODES.REQUEST_TIMEOUT) {
+    return "Timed out waiting for Chrome extension response.";
+  }
+  return code;
+}
+
 export function handleHttpRequest(
   req: IncomingMessage,
   res: ServerResponse,
   sessionManager: SessionManager,
-  startTime?: number
+  startTime?: number,
 ): boolean {
   const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
 
@@ -20,15 +33,17 @@ export function handleHttpRequest(
   if (url.pathname === "/health" && req.method === "GET") {
     const uptime = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0;
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({
-      running: true,
-      port: DAEMON_PORT,
-      version: "1.0.0",
-      uptime_seconds: uptime,
-      extensions_connected: sessionManager.hasExtension(),
-      extension_version: sessionManager.getExtensionVersion(),
-      extension_id: sessionManager.getExtensionId() || "",
-    }));
+    res.end(
+      JSON.stringify({
+        running: true,
+        port: DAEMON_PORT,
+        version: "1.0.0",
+        uptime_seconds: uptime,
+        extensions_connected: sessionManager.hasExtension(),
+        extension_version: sessionManager.getExtensionVersion(),
+        extension_id: sessionManager.getExtensionId() || "",
+      }),
+    );
     return true;
   }
 
@@ -38,12 +53,16 @@ export function handleHttpRequest(
     const toolName = toolMatch[1];
     if (!isToolName(toolName)) {
       res.writeHead(400, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: "unknown_tool", message: `Unknown tool: ${toolName}`, available_tools: TOOL_NAMES }));
+      res.end(
+        JSON.stringify({ error: "unknown_tool", message: `Unknown tool: ${toolName}`, available_tools: TOOL_NAMES }),
+      );
       return true;
     }
 
     let body = "";
-    req.on("data", (chunk) => { body += chunk; });
+    req.on("data", (chunk) => {
+      body += chunk;
+    });
     req.on("end", async () => {
       try {
         const params = body ? JSON.parse(body) : {};
@@ -58,9 +77,9 @@ export function handleHttpRequest(
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ success: true, result }));
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Unknown error";
+        const code = err instanceof Error ? err.message : "unknown_error";
         res.writeHead(500, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ success: false, error: message }));
+        res.end(JSON.stringify({ success: false, error: code, message: errorMessage(code) }));
       }
     });
     return true;

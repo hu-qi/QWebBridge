@@ -6,7 +6,23 @@ import { handleHttpRequest } from "./adapters/http.js";
 import { loadConfig } from "./config.js";
 import type { Message } from "@qweb/protocol";
 
-export function createServer(sessionManager: SessionManager, port?: number): Promise<{ httpServer: ReturnType<typeof createHttpServer> }> {
+function errorMessage(code: string): string {
+  if (code === ERROR_CODES.NO_EXTENSION_CONNECTED) {
+    return "Chrome extension is not connected. Please ensure the QwebBridge extension is installed and enabled.";
+  }
+  if (code === ERROR_CODES.EXTENSION_DISCONNECTED) {
+    return "Chrome extension disconnected before the request completed.";
+  }
+  if (code === ERROR_CODES.REQUEST_TIMEOUT) {
+    return "Timed out waiting for Chrome extension response.";
+  }
+  return code;
+}
+
+export function createServer(
+  sessionManager: SessionManager,
+  port?: number,
+): Promise<{ httpServer: ReturnType<typeof createHttpServer> }> {
   const config = loadConfig();
   const listenPort = port ?? config.port;
   const startTime = Date.now();
@@ -46,47 +62,59 @@ export function createServer(sessionManager: SessionManager, port?: number): Pro
             isExtension = true;
             const extId = (payload as { extension_id?: string }).extension_id;
             sessionManager.setExtension(ws, payload.version, extId);
-            ws.send(JSON.stringify({
-              id: msg.id,
-              type: "hello_ack",
-              payload: { status: "connected", extensionVersion: payload.version || "1.0.0" },
-            }));
+            ws.send(
+              JSON.stringify({
+                id: msg.id,
+                type: "hello_ack",
+                payload: { status: "connected", extensionVersion: payload.version || "1.0.0" },
+              }),
+            );
             return;
           }
 
           agentId = sessionManager.addAgent(ws, agent);
-          ws.send(JSON.stringify({
-            id: msg.id,
-            type: "hello_ack",
-            payload: { status: "connected", session_id: agentId },
-          }));
+          ws.send(
+            JSON.stringify({
+              id: msg.id,
+              type: "hello_ack",
+              payload: { status: "connected", session_id: agentId },
+            }),
+          );
           return;
         }
 
         if (!handshakeDone) {
-          ws.send(JSON.stringify({
-            id: msg.id || "unknown",
-            type: "error",
-            payload: { code: ERROR_CODES.PROTOCOL_ERROR, message: "Hello message required before tool calls" },
-          }));
+          ws.send(
+            JSON.stringify({
+              id: msg.id || "unknown",
+              type: "error",
+              payload: { code: ERROR_CODES.PROTOCOL_ERROR, message: "Hello message required before tool calls" },
+            }),
+          );
           return;
         }
 
         if (msg.type === "tool_call" && !isExtension) {
-          sessionManager.sendToExtension(msg)
+          sessionManager
+            .sendToExtension(msg)
             .then((result) => {
-              ws.send(JSON.stringify({
-                id: msg.id,
-                type: "tool_result",
-                payload: { result },
-              }));
+              ws.send(
+                JSON.stringify({
+                  id: msg.id,
+                  type: "tool_result",
+                  payload: { result },
+                }),
+              );
             })
             .catch((err: Error) => {
-              ws.send(JSON.stringify({
-                id: msg.id,
-                type: "error",
-                payload: { code: err.message, message: err.message },
-              }));
+              const code = err.message;
+              ws.send(
+                JSON.stringify({
+                  id: msg.id,
+                  type: "error",
+                  payload: { code, message: errorMessage(code) },
+                }),
+              );
             });
         }
       } catch {

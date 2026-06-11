@@ -1,5 +1,5 @@
 import type { SessionManager } from "../session.js";
-import { TOOL_NAMES } from "@qweb/protocol";
+import { TOOL_NAMES, ERROR_CODES } from "@qweb/protocol";
 
 interface MCPRequest {
   jsonrpc: "2.0";
@@ -13,6 +13,19 @@ interface MCPResponse {
   id: number | string;
   result?: unknown;
   error?: { code: number; message: string };
+}
+
+function errorMessage(code: string): string {
+  if (code === ERROR_CODES.NO_EXTENSION_CONNECTED) {
+    return "Chrome extension is not connected. Please ensure the QwebBridge extension is installed and enabled.";
+  }
+  if (code === ERROR_CODES.EXTENSION_DISCONNECTED) {
+    return "Chrome extension disconnected before the request completed.";
+  }
+  if (code === ERROR_CODES.REQUEST_TIMEOUT) {
+    return "Timed out waiting for Chrome extension response.";
+  }
+  return code;
 }
 
 export function createMCPAdapter(sessionManager: SessionManager): void {
@@ -92,7 +105,8 @@ export function createMCPAdapter(sessionManager: SessionManager): void {
               },
             };
 
-            sessionManager.sendToExtension(msg)
+            sessionManager
+              .sendToExtension(msg)
               .then((result) => {
                 const res: MCPResponse = {
                   jsonrpc: "2.0",
@@ -102,11 +116,12 @@ export function createMCPAdapter(sessionManager: SessionManager): void {
                 process.stdout.write(JSON.stringify(res) + "\n");
               })
               .catch((err: Error) => {
+                const code = err.message;
                 const res: MCPResponse = {
                   jsonrpc: "2.0",
                   id: req.id,
                   result: {
-                    content: [{ type: "text", text: `Error: ${err.message}` }],
+                    content: [{ type: "text", text: `Error: ${errorMessage(code)}` }],
                     isError: true,
                   },
                 };
