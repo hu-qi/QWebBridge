@@ -77,8 +77,9 @@ Response: `{ "success": true, "result": { ... } }`
 ### Tab-scoped refs
 
 Refs are scoped to one browser tab.
-Whenever consuming an `@eN` ref, pass the `tabId` of the snapshot that produced it.
-Each result pairs one `tabId` with its snapshot tree.
+Refs may be produced by `snapshot`, `multi_snapshot`, or `wait_for`.
+Whenever consuming an `@eN` ref, pass the same `tabId` used by the call that produced it.
+For `multi_snapshot`, use the `tabId` paired with the corresponding result.
 Do not rely on the extension's current tab state.
 
 ```json
