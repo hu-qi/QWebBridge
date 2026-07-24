@@ -3,14 +3,13 @@
 import { createServer } from "../server.js";
 import { SessionManager } from "../session.js";
 import { writePid, readPid, removePid, loadConfig, getLogFile, writeLog, CONFIG_DIR } from "../config.js";
-import { DAEMON_PORT } from "@qweb/protocol";
+import { DAEMON_PORT, VERSION } from "@qweb/protocol";
 import { spawn } from "child_process";
 import { existsSync, rmSync, mkdirSync, cpSync, readFileSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
 
 const command = process.argv[2];
-const VERSION = "1.0.0";
 
 async function main() {
   switch (command) {

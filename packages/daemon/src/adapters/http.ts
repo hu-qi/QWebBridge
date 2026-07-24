@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "http";
 import type { SessionManager } from "../session.js";
-import { TOOL_NAMES, DAEMON_PORT, ERROR_CODES } from "@qweb/protocol";
+import { TOOL_NAMES, DAEMON_PORT, ERROR_CODES, VERSION } from "@qweb/protocol";
 
 type ToolName = (typeof TOOL_NAMES)[number];
 
@@ -42,7 +42,7 @@ export function handleHttpRequest(
       JSON.stringify({
         running: true,
         port: DAEMON_PORT,
-        version: "1.0.1",
+        version: VERSION,
         uptime_seconds: uptime,
         extensions_connected: sessionManager.hasExtension(),
         extension_version: sessionManager.getExtensionVersion(),

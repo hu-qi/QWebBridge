@@ -41,6 +41,7 @@ export const ERROR_CODES = {
 
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];
 
+export const VERSION = "1.0.1";
 export const DAEMON_PORT = 10086;
 export const WS_PATH = "selector/command";
 export const HEARTBEAT_INTERVAL_MS = 30_000;
