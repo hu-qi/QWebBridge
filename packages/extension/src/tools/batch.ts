@@ -1,6 +1,7 @@
 import { registerTool, type ToolExecutor } from "./index.js";
 import { evaluateTool } from "./evaluate.js";
 import { snapshotTool } from "./snapshot.js";
+import { toErrorDetail } from "../tool-error.js";
 
 const multiSnapshotTool: ToolExecutor = {
   name: "multi_snapshot",
@@ -16,8 +17,8 @@ const multiSnapshotTool: ToolExecutor = {
           const tree = await snapshotTool.execute({ ...params, _tabId: tabId }, ctx);
           return { tabId, tree };
         } catch (err) {
-          const error = err instanceof Error ? err.message : String(err);
-          return { tabId, error };
+          const error = toErrorDetail(err);
+          return { tabId, error: error.message, errorCode: error.code };
         }
       }),
     );
@@ -41,8 +42,8 @@ const batchEvalTool: ToolExecutor = {
           const value = await evaluateTool.execute({ ...params, _tabId: tabId }, ctx);
           return { tabId, value };
         } catch (err) {
-          const error = err instanceof Error ? err.message : String(err);
-          return { tabId, error };
+          const error = toErrorDetail(err);
+          return { tabId, error: error.message, errorCode: error.code };
         }
       }),
     );

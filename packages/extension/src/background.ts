@@ -1,6 +1,7 @@
 import { CDPController } from "./cdp/controller.js";
 import { RefStore } from "./ref-store.js";
 import { getTool } from "./tools/index.js";
+import { toErrorDetail } from "./tool-error.js";
 import { ERROR_CODES, VERSION } from "@qweb/protocol";
 import type { Message, ToolCallPayload } from "@qweb/protocol";
 
@@ -99,12 +100,12 @@ function connect(): void {
             }),
           );
         } catch (err) {
-          const message = err instanceof Error ? err.message : "Unknown error";
+          const error = toErrorDetail(err);
           sendIfOpen(
             JSON.stringify({
               id: msg.id,
               type: "error",
-              payload: { code: ERROR_CODES.EXECUTION_ERROR, message },
+              payload: error,
             }),
           );
         }
@@ -166,11 +167,13 @@ connect();
 
 // Handle tab removal cleanup
 chrome.tabs.onRemoved.addListener((tabId) => {
-  refs.clear(tabId);
+  refs.close(tabId);
   clearNetworkCapture(tabId);
-  try {
-    cdp.detach(tabId);
-  } catch {}
+  void cdp.close(tabId);
+});
+
+chrome.tabs.onCreated.addListener((tab) => {
+  if (typeof tab.id === "number") cdp.open(tab.id);
 });
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
@@ -183,7 +186,7 @@ chrome.debugger.onDetach.addListener(({ tabId }) => {
   if (typeof tabId === "number") {
     refs.clear(tabId);
     clearNetworkCapture(tabId);
-    void cdp.detach(tabId);
+    cdp.handleDetach(tabId);
   }
 });
 

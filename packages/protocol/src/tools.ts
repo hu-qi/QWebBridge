@@ -33,7 +33,7 @@ export interface MultiSnapshotParams extends SnapshotParams {
   tabIds: number[];
 }
 export interface MultiSnapshotResult {
-  results: Array<{ tabId: number; tree?: SnapshotResult; error?: string }>;
+  results: Array<{ tabId: number; tree?: SnapshotResult; error?: string; errorCode?: string }>;
 }
 
 // === Screenshot ===
@@ -88,7 +88,7 @@ export interface BatchEvalParams extends EvaluateParams {
   tabIds: number[];
 }
 export interface BatchEvalResult {
-  results: Array<{ tabId: number; value?: unknown; error?: string }>;
+  results: Array<{ tabId: number; value?: unknown; error?: string; errorCode?: string }>;
 }
 
 // === WaitFor ===

@@ -103,9 +103,8 @@ const waitForTool: ToolExecutor = {
           const described = await tab.send<{ node: { backendNodeId: number } }>("DOM.describeNode", {
             nodeId: node.nodeId,
           });
-          const ref = `e${Date.now()}`;
-          ctx.refs.set(tabId, ref, described.node.backendNodeId);
-          return { ...value, ref: `@${ref}` };
+          const ref = ctx.refs.issue(tabId, described.node.backendNodeId);
+          return { ...value, ref };
         }
       }
 

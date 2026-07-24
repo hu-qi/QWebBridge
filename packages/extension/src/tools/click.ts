@@ -1,5 +1,6 @@
 import type { CDPTabSession } from "../cdp/controller.js";
-import { registerTool, getTabId, type ToolExecutor, type ToolContext } from "./index.js";
+import type { ResolvedRef } from "../ref-store.js";
+import { registerTool, resolveToolTarget, type ToolExecutor, type ToolContext } from "./index.js";
 
 const clickTool: ToolExecutor = {
   name: "click",
@@ -7,10 +8,10 @@ const clickTool: ToolExecutor = {
     const selector = params.selector as string;
     if (!selector) throw new Error("click: selector is required");
 
-    const tabId = await getTabId(params, ctx);
+    const { tabId, ref: resolvedRef } = await resolveToolTarget(params, ctx, selector);
     return ctx.cdp.run(tabId, (tab) => {
       if (ctx.refs.isRef(selector)) {
-        return clickByRef(selector, tabId, tab, ctx);
+        return clickByRef(selector, tabId, tab, ctx, resolvedRef);
       }
       return clickBySelector(selector, tab);
     });
@@ -30,19 +31,34 @@ async function getExecutionContextId(tab: CDPTabSession): Promise<number> {
   return pageCtx?.id ?? 1;
 }
 
-async function clickByRef(ref: string, tabId: number, tab: CDPTabSession, ctx: ToolContext): Promise<unknown> {
+async function clickByRef(
+  ref: string,
+  tabId: number,
+  tab: CDPTabSession,
+  ctx: ToolContext,
+  resolvedRef?: ResolvedRef,
+): Promise<unknown> {
   const refName = ref.startsWith("@") ? ref.slice(1) : ref;
-  const entry = ctx.refs.get(tabId, refName);
+  const entry = resolvedRef ?? ctx.refs.get(tabId, refName);
   if (!entry) throw new Error(`click: unknown ref "${ref}". Run snapshot first to get refs.`);
 
   const contextId = await getExecutionContextId(tab);
 
-  const resolveResult = await tab.send<{ object: { objectId: string } }>("DOM.resolveNode", {
-    backendNodeId: entry.backendDOMNodeId,
-    executionContextId: contextId,
-  });
+  let resolveResult: { object: { objectId: string } };
+  try {
+    resolveResult = await tab.send<{ object: { objectId: string } }>("DOM.resolveNode", {
+      backendNodeId: entry.backendDOMNodeId,
+      executionContextId: contextId,
+    });
+  } catch (error) {
+    if (!resolvedRef) throw error;
+    ctx.refs.rejectDetached(ref);
+  }
 
-  if (!resolveResult.object?.objectId) throw new Error(`click: could not resolve ref "${ref}"`);
+  if (!resolveResult.object?.objectId) {
+    if (resolvedRef) ctx.refs.rejectDetached(ref);
+    throw new Error(`click: could not resolve ref "${ref}"`);
+  }
 
   const result = await tab.send<{ result: { value: unknown }; exceptionDetails?: { text: string } }>(
     "Runtime.callFunctionOn",

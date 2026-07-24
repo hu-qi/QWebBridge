@@ -13,6 +13,7 @@ const navigateTool: ToolExecutor = {
 
     if (newTab) {
       const tab = await chrome.tabs.create({ url, active: true });
+      ctx.cdp.open(tab.id!);
       const agentSession = session || "default";
       await groupTab(tab.id!, agentSession, groupTitle);
       return ctx.cdp.run(tab.id!, async () => {

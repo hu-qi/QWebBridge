@@ -60,9 +60,8 @@ registerTool({
     const tabId = params._tabId as number | undefined;
     if (tabId == null) return { success: true };
 
-    try {
-      await ctx.cdp.detach(tabId);
-    } catch {}
+    ctx.refs.close(tabId);
+    await ctx.cdp.close(tabId);
     untrackTab(tabId);
     await chrome.tabs.remove(tabId);
     return { success: true };
@@ -77,9 +76,8 @@ registerTool({
 
     if (Array.isArray(tabIds)) {
       for (const tabId of tabIds) {
-        try {
-          await ctx.cdp.detach(tabId);
-        } catch {}
+        ctx.refs.close(tabId);
+        await ctx.cdp.close(tabId);
         untrackTab(tabId);
         await chrome.tabs.remove(tabId).catch(() => {});
       }

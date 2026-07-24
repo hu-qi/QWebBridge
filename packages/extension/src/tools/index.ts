@@ -1,12 +1,14 @@
 import type { CDPController } from "../cdp/controller.js";
-import type { RefStore } from "../ref-store.js";
+import type { RefStore, ResolvedRef } from "../ref-store.js";
+import { ERROR_CODES } from "@qweb/protocol";
+import { ToolError } from "../tool-error.js";
 
 export interface ToolContext {
   cdp: CDPController;
   refs: RefStore;
 }
 
-export async function getTabId(params: Record<string, unknown>, ctx: ToolContext): Promise<number> {
+export function getExplicitTabId(params: Record<string, unknown>): number | undefined {
   const tabId = params._tabId ?? params.tabId;
   if (tabId !== undefined) {
     if (typeof tabId !== "number" || !Number.isInteger(tabId) || tabId < 0) {
@@ -14,8 +16,31 @@ export async function getTabId(params: Record<string, unknown>, ctx: ToolContext
     }
     return tabId;
   }
+  return undefined;
+}
+
+export async function getTabId(params: Record<string, unknown>, ctx: ToolContext): Promise<number> {
+  const tabId = getExplicitTabId(params);
+  if (tabId !== undefined) return tabId;
   const tab = await ctx.cdp.getActiveTab();
   return tab.id!;
+}
+
+export async function resolveToolTarget(
+  params: Record<string, unknown>,
+  ctx: ToolContext,
+  selector?: string,
+): Promise<{ tabId: number; ref?: ResolvedRef }> {
+  if (selector && ctx.refs.isRef(selector)) {
+    const requestedTabId = getExplicitTabId(params);
+    const ref = ctx.refs.resolve(selector, requestedTabId);
+    if (ref) return { tabId: ref.tabId, ref };
+    if (requestedTabId === undefined) {
+      throw new ToolError(ERROR_CODES.INVALID_PARAMS, "Legacy refs require an explicit tabId.");
+    }
+    return { tabId: requestedTabId };
+  }
+  return { tabId: await getTabId(params, ctx) };
 }
 
 export interface ToolExecutor {

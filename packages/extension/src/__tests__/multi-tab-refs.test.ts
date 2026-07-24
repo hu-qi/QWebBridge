@@ -1,6 +1,8 @@
 import { expect, it, vi } from "vitest";
 import { RefStore } from "../ref-store.js";
 import { getTool, type ToolContext } from "../tools/index.js";
+import { ToolError } from "../tool-error.js";
+import { ERROR_CODES } from "@qweb/protocol";
 import "../tools/batch.js";
 import "../tools/click.js";
 import "../tools/fill.js";
@@ -18,6 +20,7 @@ function deferred(): { promise: Promise<void>; resolve: () => void } {
 
 function createContext(refs = new RefStore()) {
   const resolvedNodes: Array<{ tabId: number; backendNodeId: number }> = [];
+  const runTabIds: number[] = [];
   const backendNodeIds = new Map([
     [1, 101],
     [2, 202],
@@ -30,6 +33,7 @@ function createContext(refs = new RefStore()) {
         send<R>(method: string, params?: Record<string, unknown>): Promise<R>;
       }) => Promise<T>,
     ): Promise<T> {
+      runTabIds.push(tabId);
       return operation({
         tabId,
         send: <R>(method: string, params?: Record<string, unknown>) => send<R>(tabId, method, params),
@@ -99,7 +103,7 @@ function createContext(refs = new RefStore()) {
   }
 
   const ctx = { cdp, refs } as unknown as ToolContext;
-  return { ctx, refs, resolvedNodes };
+  return { ctx, refs, resolvedNodes, runTabIds };
 }
 
 it("starts snapshots for different tabs in parallel", async () => {
@@ -139,17 +143,50 @@ it("starts snapshots for different tabs in parallel", async () => {
   });
 });
 
+it("preserves structured errors in multi-tab results", async () => {
+  const ctx = {
+    cdp: {
+      async run(): Promise<never> {
+        throw new ToolError(ERROR_CODES.TAB_CLOSED, "Tab 1 is closed.");
+      },
+    },
+    refs: new RefStore(),
+  } as unknown as ToolContext;
+
+  await expect(getTool("multi_snapshot")!.execute({ tabIds: [1] }, ctx)).resolves.toEqual({
+    results: [
+      {
+        tabId: 1,
+        errorCode: "tab_closed",
+        error: "Tab 1 is closed.",
+      },
+    ],
+  });
+});
+
 it("keeps refs bound to their source tabs", async () => {
   const { ctx, resolvedNodes } = createContext();
 
-  await getTool("multi_snapshot")!.execute({ tabIds: [1, 2] }, ctx);
-  await getTool("click")!.execute({ tabId: 1, selector: "@e0" }, ctx);
-  await getTool("click")!.execute({ tabId: 2, selector: "@e0" }, ctx);
+  const result = (await getTool("multi_snapshot")!.execute({ tabIds: [1, 2] }, ctx)) as {
+    results: Array<{ tree: Array<{ ref: string }> }>;
+  };
+  await getTool("click")!.execute({ selector: result.results[0].tree[0].ref }, ctx);
+  await getTool("click")!.execute({ selector: result.results[1].tree[0].ref }, ctx);
 
   expect(resolvedNodes).toEqual([
     { tabId: 1, backendNodeId: 101 },
     { tabId: 2, backendNodeId: 202 },
   ]);
+});
+
+it("routes an opaque snapshot ref without an explicit tabId", async () => {
+  const { ctx, resolvedNodes } = createContext();
+  const snapshot = (await getTool("snapshot")!.execute({ tabId: 1 }, ctx)) as Array<{ ref: string }>;
+
+  await getTool("click")!.execute({ selector: snapshot[0].ref }, ctx);
+
+  expect(snapshot[0].ref).toMatch(/^@qref_v1_/);
+  expect(resolvedNodes).toEqual([{ tabId: 1, backendNodeId: 101 }]);
 });
 
 it.each([
@@ -169,17 +206,90 @@ it.each([
   expect(getRef).toHaveBeenCalledWith(1, "e0");
 });
 
+it.each([
+  ["click", { selector: "" }],
+  ["fill", { selector: "", value: "text" }],
+  ["mouse_click", { selector: "" }],
+  ["upload", { selector: "", files: ["/tmp/input.txt"] }],
+])("%s routes an opaque ref without tabId", async (toolName, params) => {
+  const refs = new RefStore();
+  const ref = refs.issue(1, 101);
+  const { ctx, runTabIds } = createContext(refs);
+
+  await getTool(toolName)!.execute({ ...params, selector: ref }, ctx);
+
+  expect(runTabIds).toEqual([1]);
+});
+
+it("requires tabId for a legacy ref", async () => {
+  const refs = new RefStore();
+  refs.set(1, "e0", 101);
+  const { ctx } = createContext(refs);
+
+  await expect(getTool("click")!.execute({ selector: "@e0" }, ctx)).rejects.toMatchObject({
+    code: "invalid_params",
+  });
+});
+
+it("rejects a tabId that conflicts with an opaque ref", async () => {
+  const refs = new RefStore();
+  const ref = refs.issue(1, 101);
+  const { ctx, runTabIds } = createContext(refs);
+
+  await expect(getTool("click")!.execute({ tabId: 2, selector: ref }, ctx)).rejects.toMatchObject({
+    code: "ref_tab_mismatch",
+  });
+  expect(runTabIds).toEqual([]);
+});
+
+it.each([
+  ["click", { selector: "" }],
+  ["fill", { selector: "", value: "text" }],
+  ["mouse_click", { selector: "" }],
+  ["upload", { selector: "", files: ["/tmp/input.txt"] }],
+])("%s reports a detached DOM node for an opaque ref", async (toolName, params) => {
+  const refs = new RefStore();
+  const ref = refs.issue(1, 101);
+  const cdp = {
+    async run<T>(
+      tabId: number,
+      operation: (tab: { tabId: number; send<R>(method: string): Promise<R> }) => Promise<T>,
+    ): Promise<T> {
+      return operation({
+        tabId,
+        async send<R>(method: string): Promise<R> {
+          if (method === "Runtime.evaluate") {
+            return { result: { type: "number", value: 1 }, executionContextId: 1 } as R;
+          }
+          if (method === "DOM.resolveNode" || method === "DOM.pushNodesByBackendIdsToFrontend") {
+            throw new Error("No node with given id found");
+          }
+          return {} as R;
+        },
+      });
+    },
+  };
+  const ctx = { cdp, refs } as unknown as ToolContext;
+
+  await expect(getTool(toolName)!.execute({ ...params, selector: ref }, ctx)).rejects.toMatchObject({
+    code: "node_detached",
+  });
+  expect(() => refs.resolve(ref)).toThrowError(
+    expect.objectContaining({
+      code: "node_detached",
+    }),
+  );
+});
+
 it("stores wait_for refs for the requested tab", async () => {
   const refs = new RefStore();
-  const setRef = vi.spyOn(refs, "set");
-  const { ctx } = createContext(refs);
+  const { ctx, resolvedNodes } = createContext(refs);
 
   const result = (await getTool("wait_for")!.execute({ tabId: 1, selector: "#ready", timeout: 1 }, ctx)) as {
     ref: string;
   };
-  const refName = result.ref.slice(1);
+  await getTool("click")!.execute({ selector: result.ref }, ctx);
 
-  expect(setRef).toHaveBeenCalledWith(1, refName, 303);
-  expect(refs.get(1, refName)?.backendDOMNodeId).toBe(303);
-  expect(refs.get(2, refName)).toBeUndefined();
+  expect(result.ref).toMatch(/^@qref_v1_/);
+  expect(resolvedNodes).toEqual([{ tabId: 1, backendNodeId: 303 }]);
 });

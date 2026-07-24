@@ -1,4 +1,4 @@
-import { registerTool, getTabId, type ToolExecutor } from "./index.js";
+import { registerTool, resolveToolTarget, type ToolExecutor } from "./index.js";
 
 function fillScript(targetExpr: string, value: string): string {
   const n = JSON.stringify(value);
@@ -69,22 +69,31 @@ const fillTool: ToolExecutor = {
     if (!selector) throw new Error("fill: selector is required");
     if (value == null) throw new Error("fill: value is required");
 
-    const tabId = await getTabId(params, ctx);
+    const { tabId, ref: resolvedRef } = await resolveToolTarget(params, ctx, selector);
     return ctx.cdp.run(tabId, async (tab) => {
       if (ctx.refs.isRef(selector)) {
         const refName = selector.startsWith("@") ? selector.slice(1) : selector;
-        const entry = ctx.refs.get(tabId, refName);
+        const entry = resolvedRef ?? ctx.refs.get(tabId, refName);
         if (!entry) throw new Error(`fill: unknown ref "${selector}"`);
 
         const evalCtx = await tab.send<{ executionContextId?: number }>("Runtime.evaluate", {
           expression: "1",
           returnByValue: true,
         });
-        const { object } = await tab.send<{ object: { objectId: string } }>("DOM.resolveNode", {
-          backendNodeId: entry.backendDOMNodeId,
-          executionContextId: evalCtx.executionContextId ?? 1,
-        });
-        if (!object?.objectId) throw new Error("fill: could not resolve ref");
+        let object: { objectId: string } | undefined;
+        try {
+          ({ object } = await tab.send<{ object: { objectId: string } }>("DOM.resolveNode", {
+            backendNodeId: entry.backendDOMNodeId,
+            executionContextId: evalCtx.executionContextId ?? 1,
+          }));
+        } catch (error) {
+          if (!resolvedRef) throw error;
+          ctx.refs.rejectDetached(selector);
+        }
+        if (!object?.objectId) {
+          if (resolvedRef) ctx.refs.rejectDetached(selector);
+          throw new Error("fill: could not resolve ref");
+        }
 
         const result = await tab.send<{ result: { value: unknown }; exceptionDetails?: { text: string } }>(
           "Runtime.callFunctionOn",

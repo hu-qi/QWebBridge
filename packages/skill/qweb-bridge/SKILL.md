@@ -54,10 +54,10 @@ Response: `{ "success": true, "result": { ... } }`
 |------|--------|---------|------|
 | `navigate` | `url`, `tabId`, `newTab`(bool), `group_title`, `_session` | `{success, url, tabId}` | Always use `newTab:true` on first call. `tabId` selects an existing tab |
 | `find_tab` | `url_contains`, `active`(bool), `_tabId` | `{tabId, url, title}` | **Reuse an open tab.** `url_contains` matches domain substring. `active:true` picks the user's current tab |
-| `snapshot` | `tabId`, `roles`, `name_contains`, `depth`, `interactive_only` | tree with `@e` refs | **Accessibility tree** — use filters on complex SPAs |
+| `snapshot` | `tabId`, `roles`, `name_contains`, `depth`, `interactive_only` | tree with opaque refs | **Accessibility tree** — use filters on complex SPAs |
 | `multi_snapshot` | `tabIds`, plus snapshot filters | `{results:[{tabId, tree}]}` | Batch snapshots for several tabs in one call |
-| `click` | `selector` (@e ref or CSS), `tabId` | `{success, tag, text}` | Synthetic `el.click()`. Use `@eN` refs from snapshot when possible |
-| `mouse_click` | `selector` (@e ref or CSS), `tabId` | `{success, x, y, tag, text}` | Dispatches JS `MouseEvent` at element center. Works on `<a>` links. |
+| `click` | `selector` (ref or CSS), `tabId` | `{success, tag, text}` | Synthetic `el.click()`. Omit `tabId` for an opaque ref |
+| `mouse_click` | `selector` (ref or CSS), `tabId` | `{success, x, y, tag, text}` | Dispatches JS `MouseEvent` at element center. Omit `tabId` for an opaque ref |
 | `fill` | `selector`, `value`, `tabId`, `submit` | `{success, tag, mode, submitted}` | Works on `<input>` / `<textarea>` AND `[contenteditable]`; `submit:true` sends Enter |
 | `evaluate` | `code`, `tabId`, `parse_json`, `structured` | JS value or `{value,type}` | Use `structured:true` to distinguish empty/null/undefined; `parse_json:true` parses JSON strings |
 | `batch_eval` | `tabIds`, `code`, `parse_json`, `structured` | `{results:[{tabId,value}]}` | Evaluate the same JS across multiple tabs |
@@ -76,21 +76,38 @@ Response: `{ "success": true, "result": { ... } }`
 
 ### Tab-scoped refs
 
-Refs are scoped to one browser tab.
+Refs use an opaque format such as `@qref_v1_<runtime>_<id>`.
 Refs may be produced by `snapshot`, `multi_snapshot`, or `wait_for`.
-Whenever consuming an `@eN` ref, pass the same `tabId` used by the call that produced it.
-For `multi_snapshot`, use the `tabId` paired with the corresponding result.
-Do not rely on the extension's current tab state.
+Pass the complete ref back without changing it.
+The extension obtains the source tab from the ref.
+Do not pass `tabId` when it is not required.
+If you pass `tabId`, it must match the ref.
+Legacy `@eN` refs require an explicit `tabId`.
 
 ```json
-{"tabIds":[1,2]}
+{ "tabIds": [1, 2] }
 ```
 
 Use a ref from tab 1:
 
 ```json
-{"tabId":1,"selector":"@e0"}
+{ "selector": "@qref_v1_6d8c4f_ref123" }
 ```
+
+A new `snapshot` invalidates earlier refs for that tab.
+`wait_for` adds a ref without invalidating current snapshot refs.
+Navigation, reload, and tab closure invalidate all refs for that tab.
+A service worker restart invalidates refs from the earlier runtime.
+
+Ref errors include `invalid_ref`, `stale_ref`, and `unknown_ref`.
+They also include `ref_tab_mismatch`, `tab_closed`, and `node_detached`.
+
+### CDP concurrency
+
+QwebBridge serializes complete operations within one tab.
+It runs operations for different tabs concurrently.
+The extension limits active tab operations to five by default.
+This value is a runtime default, not a protocol guarantee.
 
 ### Using find_tab
 
@@ -138,10 +155,10 @@ curl -s -X POST http://127.0.0.1:10086/api/tool/click \
   -H 'Content-Type: application/json' \
   -d '{"selector":".submit-btn"}'
 
-# click by @e ref from snapshot
+# click by opaque ref from snapshot
 curl -s -X POST http://127.0.0.1:10086/api/tool/click \
   -H 'Content-Type: application/json' \
-  -d '{"selector":"@e3"}'
+  -d '{"selector":"@qref_v1_6d8c4f_ref123"}'
 
 # fill a textarea
 curl -s -X POST http://127.0.0.1:10086/api/tool/fill \
@@ -177,10 +194,13 @@ If `$SKILL_PATH` is unavailable, call the script by its absolute path.
 
 ## Prefer snapshot over manual selectors
 
-`snapshot` returns the page accessibility tree with `@e` refs based on semantic role/name. Use these refs with `click`, `mouse_click`, and `fill` — they survive CSS class hash changes that break manually-written CSS selectors.
+`snapshot` returns opaque refs for accessibility nodes.
+Use these refs with `click`, `mouse_click`, and `fill`.
+Opaque refs avoid CSS class changes.
 
 Fall back to `evaluate` (JS) only when:
-- The target has no `@e` ref in the snapshot
+
+- The target has no ref in the snapshot
 - You need attributes not in the snapshot (e.g., `href`)
 - You need to dispatch complex event sequences
 
@@ -246,5 +266,5 @@ curl -s -X POST http://127.0.0.1:10086/api/tool/send_keys \
 
 - Always do `curl -s http://127.0.0.1:10086/health` first to verify daemon + extension are up.
 - Use `scripts/screenshot.sh` for screenshots — never call the API directly.
-- Use `@e` refs from `snapshot` over CSS selectors when possible.
+- Use opaque refs from `snapshot` over CSS selectors when possible.
 - Call `close_session` (or `close_tab`) to clean up at task end.

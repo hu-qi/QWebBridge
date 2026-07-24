@@ -1,4 +1,4 @@
-import { registerTool, getTabId } from "./index.js";
+import { registerTool, resolveToolTarget } from "./index.js";
 
 registerTool({
   name: "upload",
@@ -10,17 +10,24 @@ registerTool({
     const paths = files ?? (filePath ? [filePath] : []);
     if (paths.length === 0) throw new Error("upload: filePath or files is required");
 
-    const tabId = await getTabId(params, ctx);
+    const { tabId, ref: resolvedRef } = await resolveToolTarget(params, ctx, selector);
     return ctx.cdp.run(tabId, async (tab) => {
       let nodeId: number;
       if (ctx.refs.isRef(selector)) {
         const refName = selector.startsWith("@") ? selector.slice(1) : selector;
-        const entry = ctx.refs.get(tabId, refName);
+        const entry = resolvedRef ?? ctx.refs.get(tabId, refName);
         if (!entry) throw new Error(`upload: unknown ref "${selector}"`);
-        const result = await tab.send<{ nodeIds: number[] }>("DOM.pushNodesByBackendIdsToFrontend", {
-          backendNodeIds: [entry.backendDOMNodeId],
-        });
-        if (!result.nodeIds || result.nodeIds.length === 0) {
+        let result: { nodeIds: number[] } | undefined;
+        try {
+          result = await tab.send<{ nodeIds: number[] }>("DOM.pushNodesByBackendIdsToFrontend", {
+            backendNodeIds: [entry.backendDOMNodeId],
+          });
+        } catch (error) {
+          if (!resolvedRef) throw error;
+          ctx.refs.rejectDetached(selector);
+        }
+        if (!result?.nodeIds || result.nodeIds.length === 0) {
+          if (resolvedRef) ctx.refs.rejectDetached(selector);
           throw new Error("upload: could not resolve ref to nodeId");
         }
         nodeId = result.nodeIds[0];

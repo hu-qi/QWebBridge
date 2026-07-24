@@ -94,8 +94,7 @@ export const snapshotTool: ToolExecutor = {
         throw new Error(`snapshot CDP error: ${error instanceof Error ? error.message : String(error)}`);
       }
 
-      ctx.refs.clear(tabId);
-      let refIndex = 0;
+      ctx.refs.beginSnapshot(tabId);
 
       const nodeMap = new Map<number, AXNode>();
       for (const node of result.nodes) {
@@ -116,19 +115,17 @@ export const snapshotTool: ToolExecutor = {
           }
           if (children.length === 0) return null;
           if (children.length === 1) return children[0];
-          const groupRef = `e${refIndex++}`;
-          ctx.refs.set(tabId, groupRef, node.backendDOMNodeId);
-          return { role: "group", ref: `@${groupRef}`, children };
+          const groupRef = ctx.refs.issue(tabId, node.backendDOMNodeId);
+          return { role: "group", ref: groupRef, children };
         }
 
-        const ref = `e${refIndex++}`;
-        ctx.refs.set(tabId, ref, node.backendDOMNodeId);
+        const ref = ctx.refs.issue(tabId, node.backendDOMNodeId);
 
         const element: SnapshotElement = {
           role,
           name: node.name?.value,
           value: node.value?.value,
-          ref: `@${ref}`,
+          ref,
           children: [],
         };
 

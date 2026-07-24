@@ -1,11 +1,14 @@
-import { registerTool, getTabId, type ToolExecutor } from "./index.js";
+import { registerTool, type ToolExecutor } from "./index.js";
 import type { CDPTabSession } from "../cdp/controller.js";
+import type { ResolvedRef } from "../ref-store.js";
+import { resolveToolTarget } from "./index.js";
 
 interface ToolCtx {
   tab: CDPTabSession;
   refs: {
     isRef: (s: string) => boolean;
     get: (tabId: number, ref: string) => { backendDOMNodeId: number } | undefined;
+    rejectDetached: (ref: string) => never;
   };
 }
 
@@ -15,13 +18,13 @@ const mouseClickTool: ToolExecutor = {
     const selector = params.selector as string;
     if (!selector) throw new Error("mouse_click: selector is required");
 
-    const tabId = await getTabId(params, ctx);
+    const { tabId, ref: resolvedRef } = await resolveToolTarget(params, ctx, selector);
     return ctx.cdp.run(tabId, async (tab) => {
       let cx: number, cy: number, tag: string, text: string;
       const toolCtx = { tab, refs: ctx.refs };
 
       if (ctx.refs.isRef(selector)) {
-        ({ cx, cy, tag, text } = await getCoordsByRef(selector, tabId, toolCtx));
+        ({ cx, cy, tag, text } = await getCoordsByRef(selector, tabId, toolCtx, resolvedRef));
       } else {
         ({ cx, cy, tag, text } = await getCoordsBySelector(selector, toolCtx));
       }
@@ -55,20 +58,30 @@ async function getCoordsByRef(
   ref: string,
   tabId: number,
   ctx: ToolCtx,
+  resolvedRef?: ResolvedRef,
 ): Promise<{ cx: number; cy: number; tag: string; text: string }> {
   const refName = ref.startsWith("@") ? ref.slice(1) : ref;
-  const entry = ctx.refs.get(tabId, refName);
+  const entry = resolvedRef ?? ctx.refs.get(tabId, refName);
   if (!entry) throw new Error(`mouse_click: unknown ref "${ref}"`);
 
   const evalCtx = await ctx.tab.send<{ executionContextId?: number }>("Runtime.evaluate", {
     expression: "1",
     returnByValue: true,
   });
-  const { object } = await ctx.tab.send<{ object: { objectId: string } }>("DOM.resolveNode", {
-    backendNodeId: entry.backendDOMNodeId,
-    executionContextId: evalCtx.executionContextId ?? 1,
-  });
-  if (!object?.objectId) throw new Error("mouse_click: could not resolve ref");
+  let object: { objectId: string } | undefined;
+  try {
+    ({ object } = await ctx.tab.send<{ object: { objectId: string } }>("DOM.resolveNode", {
+      backendNodeId: entry.backendDOMNodeId,
+      executionContextId: evalCtx.executionContextId ?? 1,
+    }));
+  } catch (error) {
+    if (!resolvedRef) throw error;
+    ctx.refs.rejectDetached(ref);
+  }
+  if (!object?.objectId) {
+    if (resolvedRef) ctx.refs.rejectDetached(ref);
+    throw new Error("mouse_click: could not resolve ref");
+  }
 
   const rect = await ctx.tab.send<{
     result: { value: { x: number; y: number; w: number; h: number; tag: string; text: string } };

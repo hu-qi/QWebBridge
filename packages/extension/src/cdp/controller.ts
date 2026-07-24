@@ -1,22 +1,137 @@
+import { ERROR_CODES } from "@qweb/protocol";
+import { ToolError } from "../tool-error.js";
+
 export interface CDPTabSession {
   readonly tabId: number;
+  readonly signal: AbortSignal;
   send<T>(method: string, params?: Record<string, unknown>): Promise<T>;
+}
+
+export const DEFAULT_MAX_CONCURRENT_TAB_OPERATIONS = 5;
+
+export interface CDPControllerOptions {
+  maxConcurrentTabOperations?: number;
+}
+
+interface SemaphoreWaiter {
+  resolve: (release: () => void) => void;
+  reject: (error: unknown) => void;
+  signal: AbortSignal;
+  onAbort: () => void;
+}
+
+interface TabLane {
+  tail: Promise<void>;
+  abortController: AbortController;
+}
+
+class Semaphore {
+  private available: number;
+  private waiters: SemaphoreWaiter[] = [];
+
+  constructor(limit: number) {
+    this.available = limit;
+  }
+
+  acquire(signal: AbortSignal): Promise<() => void> {
+    throwIfAborted(signal);
+    if (this.available > 0) {
+      this.available -= 1;
+      return Promise.resolve(this.createRelease());
+    }
+
+    return new Promise((resolve, reject) => {
+      const waiter: SemaphoreWaiter = {
+        resolve,
+        reject,
+        signal,
+        onAbort: () => {
+          const index = this.waiters.indexOf(waiter);
+          if (index >= 0) this.waiters.splice(index, 1);
+          reject(getAbortReason(signal));
+        },
+      };
+      signal.addEventListener("abort", waiter.onAbort, { once: true });
+      this.waiters.push(waiter);
+    });
+  }
+
+  private createRelease(): () => void {
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+
+      const next = this.waiters.shift();
+      if (next) {
+        next.signal.removeEventListener("abort", next.onAbort);
+        next.resolve(this.createRelease());
+      } else {
+        this.available += 1;
+      }
+    };
+  }
 }
 
 export class CDPController {
   private attachedTabs = new Set<number>();
+  private closedTabs = new Set<number>();
   private fallbackTabId: number | null = null;
-  private tabQueues = new Map<number, Promise<void>>();
+  private tabLanes = new Map<number, TabLane>();
+  private readonly semaphore: Semaphore;
+
+  constructor(options: CDPControllerOptions = {}) {
+    const limit = options.maxConcurrentTabOperations ?? DEFAULT_MAX_CONCURRENT_TAB_OPERATIONS;
+    if (!Number.isInteger(limit) || limit < 1) {
+      throw new Error("maxConcurrentTabOperations must be a positive integer");
+    }
+    this.semaphore = new Semaphore(limit);
+  }
 
   async run<T>(tabId: number, operation: (tab: CDPTabSession) => Promise<T>): Promise<T> {
-    return this.enqueue(tabId, async () => {
-      await this.attach(tabId);
-      const tab: CDPTabSession = {
-        tabId,
-        send: <R>(method: string, params?: Record<string, unknown>) => this.sendToTab<R>(tabId, method, params),
-      };
-      return operation(tab);
+    if (this.closedTabs.has(tabId)) {
+      throw new ToolError(ERROR_CODES.TAB_CLOSED, `Tab ${tabId} is closed.`);
+    }
+    return this.enqueue(tabId, async (signal) => {
+      const release = await this.semaphore.acquire(signal);
+      try {
+        throwIfAborted(signal);
+        await this.attach(tabId);
+        throwIfAborted(signal);
+        const tab: CDPTabSession = {
+          tabId,
+          signal,
+          send: <R>(method: string, params?: Record<string, unknown>) =>
+            this.sendToTab<R>(tabId, method, params, signal),
+        };
+        const result = await operation(tab);
+        throwIfAborted(signal);
+        return result;
+      } finally {
+        release();
+      }
     });
+  }
+
+  async close(tabId: number): Promise<void> {
+    this.closedTabs.add(tabId);
+    this.cancelLane(tabId, new ToolError(ERROR_CODES.TAB_CLOSED, `Tab ${tabId} is closed.`));
+
+    try {
+      await chrome.debugger.detach({ tabId });
+    } catch {
+      // Chrome can close the tab before this cleanup runs.
+    }
+    this.attachedTabs.delete(tabId);
+  }
+
+  open(tabId: number): void {
+    this.closedTabs.delete(tabId);
+  }
+
+  handleDetach(tabId: number): void {
+    this.attachedTabs.delete(tabId);
+    this.cancelLane(tabId, new ToolError(ERROR_CODES.OPERATION_ABORTED, `Debugger detached from tab ${tabId}.`));
   }
 
   async detach(tabId: number): Promise<void> {
@@ -55,43 +170,66 @@ export class CDPController {
   private async attach(tabId: number): Promise<void> {
     if (this.attachedTabs.has(tabId)) return;
 
-    try {
-      await chrome.debugger.detach({ tabId });
-    } catch {
-      // The tab can start without a debugger connection.
-    }
-
     await chrome.debugger.attach({ tabId }, "1.3");
     this.attachedTabs.add(tabId);
   }
 
-  private async sendToTab<T>(tabId: number, method: string, params?: Record<string, unknown>): Promise<T> {
+  private async sendToTab<T>(
+    tabId: number,
+    method: string,
+    params: Record<string, unknown> | undefined,
+    signal: AbortSignal,
+  ): Promise<T> {
+    throwIfAborted(signal);
     try {
-      return (await chrome.debugger.sendCommand({ tabId }, method, params as Record<string, never>)) as T;
+      const result = (await chrome.debugger.sendCommand({ tabId }, method, params as Record<string, never>)) as T;
+      throwIfAborted(signal);
+      return result;
     } catch (error: unknown) {
+      throwIfAborted(signal);
       const message = error instanceof Error ? error.message : String(error);
       if (message.includes("Cannot find context") || message.includes("Execution context was destroyed")) {
         await this.ensureExecutionContext(tabId);
+        throwIfAborted(signal);
         return (await chrome.debugger.sendCommand({ tabId }, method, params as Record<string, never>)) as T;
       }
       throw error;
     }
   }
 
-  private enqueue<T>(tabId: number, operation: () => Promise<T>): Promise<T> {
-    const previous = this.tabQueues.get(tabId) ?? Promise.resolve();
-    const result = previous.then(operation, operation);
+  private enqueue<T>(tabId: number, operation: (signal: AbortSignal) => Promise<T>): Promise<T> {
+    let lane = this.tabLanes.get(tabId);
+    if (!lane) {
+      lane = {
+        tail: Promise.resolve(),
+        abortController: new AbortController(),
+      };
+      this.tabLanes.set(tabId, lane);
+    }
+
+    const run = () => {
+      throwIfAborted(lane!.abortController.signal);
+      return operation(lane!.abortController.signal);
+    };
+    const result = lane.tail.then(run, run);
     const tail = result.then(
       () => undefined,
       () => undefined,
     );
-    this.tabQueues.set(tabId, tail);
+    lane.tail = tail;
 
     return result.finally(() => {
-      if (this.tabQueues.get(tabId) === tail) {
-        this.tabQueues.delete(tabId);
+      if (this.tabLanes.get(tabId) === lane && lane!.tail === tail) {
+        this.tabLanes.delete(tabId);
       }
     });
+  }
+
+  private cancelLane(tabId: number, error: ToolError): void {
+    const lane = this.tabLanes.get(tabId);
+    if (!lane) return;
+    this.tabLanes.delete(tabId);
+    lane.abortController.abort(error);
   }
 
   private async ensureExecutionContext(tabId: number): Promise<void> {
@@ -102,4 +240,12 @@ export class CDPController {
       // Chrome can still initialize the execution context.
     }
   }
+}
+
+function throwIfAborted(signal: AbortSignal): void {
+  if (signal.aborted) throw getAbortReason(signal);
+}
+
+function getAbortReason(signal: AbortSignal): unknown {
+  return signal.reason ?? new ToolError(ERROR_CODES.OPERATION_ABORTED, "Operation was aborted.");
 }
