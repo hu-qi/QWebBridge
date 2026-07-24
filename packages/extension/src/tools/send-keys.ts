@@ -23,7 +23,7 @@ registerTool({
     const keys = params.keys as string;
     if (typeof keys !== "string" || !keys.trim()) throw new Error("send_keys: keys is required");
 
-    await ctx.cdp.attach(await getTabId(params, ctx));
+    const tabId = await getTabId(params, ctx);
 
     const parts = keys.split("+");
     const keyName = parts[parts.length - 1];
@@ -40,20 +40,22 @@ registerTool({
 
     const keyDef = KEY_MAP[keyName] || { code: keyName, key: keyName.toLowerCase(), text: keyName.toLowerCase() };
 
-    await ctx.cdp.send("Input.dispatchKeyEvent", {
-      type: "rawKeyDown",
-      key: keyDef.key,
-      code: keyDef.code,
-      text: keyDef.text,
-      modifiers,
-    });
-    await ctx.cdp.send("Input.dispatchKeyEvent", {
-      type: "keyUp",
-      key: keyDef.key,
-      code: keyDef.code,
-      modifiers,
-    });
+    return ctx.cdp.run(tabId, async (tab) => {
+      await tab.send("Input.dispatchKeyEvent", {
+        type: "rawKeyDown",
+        key: keyDef.key,
+        code: keyDef.code,
+        text: keyDef.text,
+        modifiers,
+      });
+      await tab.send("Input.dispatchKeyEvent", {
+        type: "keyUp",
+        key: keyDef.key,
+        code: keyDef.code,
+        modifiers,
+      });
 
-    return { success: true };
+      return { success: true };
+    });
   },
 });

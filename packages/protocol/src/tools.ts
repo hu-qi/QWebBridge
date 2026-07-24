@@ -38,6 +38,7 @@ export interface MultiSnapshotResult {
 
 // === Screenshot ===
 export interface ScreenshotParams {
+  tabId?: number;
   format?: "png" | "jpeg" | "webp";
   quality?: number;
   fullPage?: boolean;
@@ -78,6 +79,7 @@ export interface FillResult {
 // === Evaluate ===
 export interface EvaluateParams {
   code: string;
+  tabId?: number;
   parse_json?: boolean;
   structured?: boolean;
 }
@@ -107,6 +109,7 @@ export interface WaitForResult {
 
 // === StreamingStatus ===
 export interface StreamingStatusParams {
+  tabId?: number;
   selector?: string;
 }
 export interface StreamingStatusResult {
@@ -133,6 +136,7 @@ export interface MouseClickResult {
 // === KeyType ===
 export interface KeyTypeParams {
   text: string;
+  tabId?: number;
 }
 export interface KeyTypeResult {
   success: boolean;
@@ -141,6 +145,7 @@ export interface KeyTypeResult {
 // === SendKeys ===
 export interface SendKeysParams {
   keys: string;
+  tabId?: number;
 }
 export interface SendKeysResult {
   success: boolean;
@@ -161,6 +166,7 @@ export interface UploadResult {
 export type NetworkCmd = "start" | "stop" | "list" | "detail";
 export interface NetworkParams {
   cmd: NetworkCmd;
+  tabId?: number;
   filter?: string;
   requestId?: string;
 }
@@ -219,6 +225,7 @@ export interface SuccessResult {
 
 // === SaveAsPdf ===
 export interface SaveAsPdfParams {
+  tabId?: number;
   filePath?: string;
 }
 export interface SaveAsPdfResult {

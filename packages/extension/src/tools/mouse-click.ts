@@ -1,7 +1,8 @@
 import { registerTool, getTabId, type ToolExecutor } from "./index.js";
+import type { CDPTabSession } from "../cdp/controller.js";
 
 interface ToolCtx {
-  cdp: { send: <T>(method: string, params?: Record<string, unknown>) => Promise<T> };
+  tab: CDPTabSession;
   refs: {
     isRef: (s: string) => boolean;
     get: (tabId: number, ref: string) => { backendDOMNodeId: number } | undefined;
@@ -15,17 +16,17 @@ const mouseClickTool: ToolExecutor = {
     if (!selector) throw new Error("mouse_click: selector is required");
 
     const tabId = await getTabId(params, ctx);
-    await ctx.cdp.attach(tabId);
+    return ctx.cdp.run(tabId, async (tab) => {
+      let cx: number, cy: number, tag: string, text: string;
+      const toolCtx = { tab, refs: ctx.refs };
 
-    let cx: number, cy: number, tag: string, text: string;
+      if (ctx.refs.isRef(selector)) {
+        ({ cx, cy, tag, text } = await getCoordsByRef(selector, tabId, toolCtx));
+      } else {
+        ({ cx, cy, tag, text } = await getCoordsBySelector(selector, toolCtx));
+      }
 
-    if (ctx.refs.isRef(selector)) {
-      ({ cx, cy, tag, text } = await getCoordsByRef(selector, tabId, ctx));
-    } else {
-      ({ cx, cy, tag, text } = await getCoordsBySelector(selector, ctx));
-    }
-
-    const dispatchScript = `(() => {
+      const dispatchScript = `(() => {
       const el = document.elementFromPoint(${cx}, ${cy});
       if (!el) return { error: 'no element at (${cx}, ${cy})' };
       [ 'mousemove', 'mousedown', 'mouseup', 'click' ].forEach(type => {
@@ -37,15 +38,16 @@ const mouseClickTool: ToolExecutor = {
       return { success: true };
     })()`;
 
-    const result = await ctx.cdp.send<{ result: { value: unknown }; exceptionDetails?: { text: string } }>(
-      "Runtime.evaluate",
-      { expression: dispatchScript, returnByValue: true },
-    );
-    if (result.exceptionDetails) throw new Error(`mouse_click: ${result.exceptionDetails.text}`);
-    const val = result.result.value as { error?: string; success?: boolean };
-    if (val.error) throw new Error(`mouse_click: ${val.error}`);
+      const result = await tab.send<{ result: { value: unknown }; exceptionDetails?: { text: string } }>(
+        "Runtime.evaluate",
+        { expression: dispatchScript, returnByValue: true },
+      );
+      if (result.exceptionDetails) throw new Error(`mouse_click: ${result.exceptionDetails.text}`);
+      const val = result.result.value as { error?: string; success?: boolean };
+      if (val.error) throw new Error(`mouse_click: ${val.error}`);
 
-    return { success: true, x: cx, y: cy, tag, text };
+      return { success: true, x: cx, y: cy, tag, text };
+    });
   },
 };
 
@@ -58,17 +60,17 @@ async function getCoordsByRef(
   const entry = ctx.refs.get(tabId, refName);
   if (!entry) throw new Error(`mouse_click: unknown ref "${ref}"`);
 
-  const evalCtx = await ctx.cdp.send<{ executionContextId?: number }>("Runtime.evaluate", {
+  const evalCtx = await ctx.tab.send<{ executionContextId?: number }>("Runtime.evaluate", {
     expression: "1",
     returnByValue: true,
   });
-  const { object } = await ctx.cdp.send<{ object: { objectId: string } }>("DOM.resolveNode", {
+  const { object } = await ctx.tab.send<{ object: { objectId: string } }>("DOM.resolveNode", {
     backendNodeId: entry.backendDOMNodeId,
     executionContextId: evalCtx.executionContextId ?? 1,
   });
   if (!object?.objectId) throw new Error("mouse_click: could not resolve ref");
 
-  const rect = await ctx.cdp.send<{
+  const rect = await ctx.tab.send<{
     result: { value: { x: number; y: number; w: number; h: number; tag: string; text: string } };
     exceptionDetails?: { text: string };
   }>("Runtime.callFunctionOn", {
@@ -88,10 +90,10 @@ async function getCoordsByRef(
 
 async function getCoordsBySelector(
   selector: string,
-  ctx: Pick<ToolCtx, "cdp">,
+  ctx: Pick<ToolCtx, "tab">,
 ): Promise<{ cx: number; cy: number; tag: string; text: string }> {
   const escaped = JSON.stringify(selector);
-  const result = await ctx.cdp.send<{
+  const result = await ctx.tab.send<{
     result: { value: { x: number; y: number; w: number; h: number; tag: string; text: string } };
     exceptionDetails?: { text: string };
   }>("Runtime.evaluate", {

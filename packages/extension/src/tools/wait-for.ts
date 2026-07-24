@@ -14,14 +14,13 @@ const waitForTool: ToolExecutor = {
     }
 
     const tabId = await getTabId(params, ctx);
-    await ctx.cdp.attach(tabId);
-
-    const marker = `qweb-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    const result = await ctx.cdp.send<{
-      result: { value: { success: boolean; found: boolean; elapsed_ms: number; error?: string; marked?: boolean } };
-      exceptionDetails?: { text: string };
-    }>("Runtime.evaluate", {
-      expression: `(() => new Promise((resolve) => {
+    return ctx.cdp.run(tabId, async (tab) => {
+      const marker = `qweb-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const result = await tab.send<{
+        result: { value: { success: boolean; found: boolean; elapsed_ms: number; error?: string; marked?: boolean } };
+        exceptionDetails?: { text: string };
+      }>("Runtime.evaluate", {
+        expression: `(() => new Promise((resolve) => {
         const selector = ${JSON.stringify(selector)};
         const text = ${JSON.stringify(text ?? "")};
         const state = ${JSON.stringify(state)};
@@ -87,30 +86,31 @@ const waitForTool: ToolExecutor = {
           }
         }, 100);
       }))()`,
-      returnByValue: true,
-      awaitPromise: true,
-    });
-
-    if (result.exceptionDetails) throw new Error(`wait_for: ${result.exceptionDetails.text}`);
-
-    const value = result.result.value;
-    if (value.marked) {
-      const doc = await ctx.cdp.send<{ root: { nodeId: number } }>("DOM.getDocument");
-      const node = await ctx.cdp.send<{ nodeId: number }>("DOM.querySelector", {
-        nodeId: doc.root.nodeId,
-        selector: `[data-qweb-wait-ref="${marker}"]`,
+        returnByValue: true,
+        awaitPromise: true,
       });
-      if (node.nodeId) {
-        const described = await ctx.cdp.send<{ node: { backendNodeId: number } }>("DOM.describeNode", {
-          nodeId: node.nodeId,
-        });
-        const ref = `e${Date.now()}`;
-        ctx.refs.set(tabId, ref, described.node.backendNodeId);
-        return { ...value, ref: `@${ref}` };
-      }
-    }
 
-    return value;
+      if (result.exceptionDetails) throw new Error(`wait_for: ${result.exceptionDetails.text}`);
+
+      const value = result.result.value;
+      if (value.marked) {
+        const doc = await tab.send<{ root: { nodeId: number } }>("DOM.getDocument");
+        const node = await tab.send<{ nodeId: number }>("DOM.querySelector", {
+          nodeId: doc.root.nodeId,
+          selector: `[data-qweb-wait-ref="${marker}"]`,
+        });
+        if (node.nodeId) {
+          const described = await tab.send<{ node: { backendNodeId: number } }>("DOM.describeNode", {
+            nodeId: node.nodeId,
+          });
+          const ref = `e${Date.now()}`;
+          ctx.refs.set(tabId, ref, described.node.backendNodeId);
+          return { ...value, ref: `@${ref}` };
+        }
+      }
+
+      return value;
+    });
   },
 };
 

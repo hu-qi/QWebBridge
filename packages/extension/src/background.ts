@@ -17,7 +17,7 @@ import "./tools/send-keys.js";
 import "./tools/wait-for.js";
 import "./tools/streaming-status.js";
 import "./tools/upload.js";
-import "./tools/network.js";
+import { clearNetworkCapture } from "./tools/network.js";
 import "./tools/tabs.js";
 import "./tools/save-as-pdf.js";
 
@@ -90,7 +90,7 @@ function connect(): void {
         }
 
         try {
-          const result = await cdp.runExclusive(() => tool.execute(cmd.params, { cdp, refs }));
+          const result = await tool.execute(cmd.params, { cdp, refs });
           sendIfOpen(
             JSON.stringify({
               id: msg.id,
@@ -167,6 +167,7 @@ connect();
 // Handle tab removal cleanup
 chrome.tabs.onRemoved.addListener((tabId) => {
   refs.clear(tabId);
+  clearNetworkCapture(tabId);
   try {
     cdp.detach(tabId);
   } catch {}
@@ -181,6 +182,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
 chrome.debugger.onDetach.addListener(({ tabId }) => {
   if (typeof tabId === "number") {
     refs.clear(tabId);
+    clearNetworkCapture(tabId);
     void cdp.detach(tabId);
   }
 });

@@ -41,22 +41,23 @@ export const evaluateTool: ToolExecutor = {
     const structured = params.structured === true;
     if (!code) throw new Error("evaluate: code is required");
 
-    await ctx.cdp.attach(await getTabId(params, ctx));
+    const tabId = await getTabId(params, ctx);
+    return ctx.cdp.run(tabId, async (tab) => {
+      const result = await tab.send<RuntimeEvaluateResult>("Runtime.evaluate", {
+        expression: code,
+        returnByValue: true,
+        awaitPromise: true,
+      });
 
-    const result = await ctx.cdp.send<RuntimeEvaluateResult>("Runtime.evaluate", {
-      expression: code,
-      returnByValue: true,
-      awaitPromise: true,
+      if (result.exceptionDetails) {
+        throw new Error(`evaluate: ${result.exceptionDetails.text}`);
+      }
+
+      if (structured) {
+        return structuredValue(result.result, parseJson);
+      }
+      return maybeParseJson(result.result.value, parseJson);
     });
-
-    if (result.exceptionDetails) {
-      throw new Error(`evaluate: ${result.exceptionDetails.text}`);
-    }
-
-    if (structured) {
-      return structuredValue(result.result, parseJson);
-    }
-    return maybeParseJson(result.result.value, parseJson);
   },
 };
 

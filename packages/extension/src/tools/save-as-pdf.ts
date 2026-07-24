@@ -3,14 +3,15 @@ import { registerTool, getTabId, type ToolExecutor } from "./index.js";
 const saveAsPdfTool: ToolExecutor = {
   name: "save_as_pdf",
   async execute(params, ctx) {
-    await ctx.cdp.attach(await getTabId(params, ctx));
+    const tabId = await getTabId(params, ctx);
+    return ctx.cdp.run(tabId, async (tab) => {
+      const result = await tab.send<{ data: string }>("Page.printToPDF", {
+        printBackground: true,
+        preferCSSPageSize: true,
+      });
 
-    const result = await ctx.cdp.send<{ data: string }>("Page.printToPDF", {
-      printBackground: true,
-      preferCSSPageSize: true,
+      return { success: true, data: result.data };
     });
-
-    return { success: true, data: result.data };
   },
 };
 
