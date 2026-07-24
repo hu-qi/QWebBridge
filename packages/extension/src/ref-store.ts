@@ -3,14 +3,19 @@ interface RefEntry {
 }
 
 export class RefStore {
-  private refs = new Map<string, RefEntry>();
+  private refsByTab = new Map<number, Map<string, RefEntry>>();
 
-  set(ref: string, backendDOMNodeId: number): void {
-    this.refs.set(ref, { backendDOMNodeId });
+  set(tabId: number, ref: string, backendDOMNodeId: number): void {
+    let refs = this.refsByTab.get(tabId);
+    if (!refs) {
+      refs = new Map<string, RefEntry>();
+      this.refsByTab.set(tabId, refs);
+    }
+    refs.set(ref, { backendDOMNodeId });
   }
 
-  get(ref: string): RefEntry | undefined {
-    return this.refs.get(ref);
+  get(tabId: number, ref: string): RefEntry | undefined {
+    return this.refsByTab.get(tabId)?.get(ref);
   }
 
   resolveRef(ref: string): string {
@@ -21,11 +26,15 @@ export class RefStore {
     return /^@?e\d+$/.test(value);
   }
 
-  clear(): void {
-    this.refs.clear();
+  clear(tabId: number): void {
+    this.refsByTab.delete(tabId);
   }
 
   get size(): number {
-    return this.refs.size;
+    let size = 0;
+    for (const refs of this.refsByTab.values()) {
+      size += refs.size;
+    }
+    return size;
   }
 }

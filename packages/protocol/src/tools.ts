@@ -1,6 +1,7 @@
 // === Navigate ===
 export interface NavigateParams {
   url: string;
+  tabId?: number;
   newTab?: boolean;
   _session?: string;
   group_title?: string;
@@ -21,6 +22,7 @@ export interface SnapshotElement {
   children?: SnapshotElement[];
 }
 export interface SnapshotParams {
+  tabId?: number;
   roles?: string[];
   name_contains?: string;
   depth?: number;
@@ -51,6 +53,7 @@ export interface ScreenshotResult {
 // === Click ===
 export interface ClickParams {
   selector: string;
+  tabId?: number;
 }
 export interface ClickResult {
   success: boolean;
@@ -62,6 +65,7 @@ export interface ClickResult {
 export interface FillParams {
   selector: string;
   value: string;
+  tabId?: number;
   submit?: boolean;
 }
 export interface FillResult {
@@ -88,6 +92,7 @@ export interface BatchEvalResult {
 // === WaitFor ===
 export interface WaitForParams {
   selector: string;
+  tabId?: number;
   text?: string;
   state?: "visible" | "hidden" | "removed";
   timeout?: number;
@@ -115,6 +120,7 @@ export interface StreamingStatusResult {
 // === MouseClick ===
 export interface MouseClickParams {
   selector: string;
+  tabId?: number;
 }
 export interface MouseClickResult {
   success: boolean;
@@ -143,6 +149,7 @@ export interface SendKeysResult {
 // === Upload ===
 export interface UploadParams {
   selector: string;
+  tabId?: number;
   filePath?: string;
   files?: string[];
 }

@@ -99,7 +99,7 @@ export const snapshotTool: ToolExecutor = {
       throw new Error(`snapshot CDP error: ${e instanceof Error ? e.message : String(e)}`);
     }
 
-    ctx.refs.clear();
+    ctx.refs.clear(tabId);
     let refIndex = 0;
 
     const nodeMap = new Map<number, AXNode>();
@@ -122,12 +122,12 @@ export const snapshotTool: ToolExecutor = {
         if (children.length === 0) return null;
         if (children.length === 1) return children[0];
         const groupRef = `e${refIndex++}`;
-        ctx.refs.set(groupRef, node.backendDOMNodeId);
+        ctx.refs.set(tabId, groupRef, node.backendDOMNodeId);
         return { role: "group", ref: `@${groupRef}`, children };
       }
 
       const ref = `e${refIndex++}`;
-      ctx.refs.set(ref, node.backendDOMNodeId);
+      ctx.refs.set(tabId, ref, node.backendDOMNodeId);
 
       const element: SnapshotElement = {
         role,

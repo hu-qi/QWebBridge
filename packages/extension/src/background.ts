@@ -166,13 +166,21 @@ connect();
 
 // Handle tab removal cleanup
 chrome.tabs.onRemoved.addListener((tabId) => {
+  refs.clear(tabId);
   try {
     cdp.detach(tabId);
   } catch {}
 });
 
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  if (changeInfo.status === "loading") {
+    refs.clear(tabId);
+  }
+});
+
 chrome.debugger.onDetach.addListener(({ tabId }) => {
   if (tabId) {
+    refs.clear(tabId);
     try {
       cdp.detach(tabId);
     } catch {}

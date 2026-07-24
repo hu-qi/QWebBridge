@@ -6,10 +6,11 @@ const clickTool: ToolExecutor = {
     const selector = params.selector as string;
     if (!selector) throw new Error("click: selector is required");
 
-    await ctx.cdp.attach(await getTabId(params, ctx));
+    const tabId = await getTabId(params, ctx);
+    await ctx.cdp.attach(tabId);
 
     if (ctx.refs.isRef(selector)) {
-      return clickByRef(selector, ctx);
+      return clickByRef(selector, tabId, ctx);
     }
     return clickBySelector(selector, ctx);
   },
@@ -28,9 +29,9 @@ async function getExecutionContextId(ctx: ToolContext): Promise<number> {
   return pageCtx?.id ?? 1;
 }
 
-async function clickByRef(ref: string, ctx: ToolContext): Promise<unknown> {
+async function clickByRef(ref: string, tabId: number, ctx: ToolContext): Promise<unknown> {
   const refName = ref.startsWith("@") ? ref.slice(1) : ref;
-  const entry = ctx.refs.get(refName);
+  const entry = ctx.refs.get(tabId, refName);
   if (!entry) throw new Error(`click: unknown ref "${ref}". Run snapshot first to get refs.`);
 
   const contextId = await getExecutionContextId(ctx);
