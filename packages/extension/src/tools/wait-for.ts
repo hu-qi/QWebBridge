@@ -13,7 +13,8 @@ const waitForTool: ToolExecutor = {
       throw new Error("wait_for: state must be visible, hidden, or removed");
     }
 
-    await ctx.cdp.attach(await getTabId(params, ctx));
+    const tabId = await getTabId(params, ctx);
+    await ctx.cdp.attach(tabId);
 
     const marker = `qweb-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const result = await ctx.cdp.send<{
@@ -104,7 +105,7 @@ const waitForTool: ToolExecutor = {
           nodeId: node.nodeId,
         });
         const ref = `e${Date.now()}`;
-        ctx.refs.set(ref, described.node.backendNodeId);
+        ctx.refs.set(tabId, ref, described.node.backendNodeId);
         return { ...value, ref: `@${ref}` };
       }
     }

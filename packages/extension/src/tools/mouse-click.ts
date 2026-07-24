@@ -2,7 +2,10 @@ import { registerTool, getTabId, type ToolExecutor } from "./index.js";
 
 interface ToolCtx {
   cdp: { send: <T>(method: string, params?: Record<string, unknown>) => Promise<T> };
-  refs: { isRef: (s: string) => boolean; get: (s: string) => { backendDOMNodeId: number } | undefined };
+  refs: {
+    isRef: (s: string) => boolean;
+    get: (tabId: number, ref: string) => { backendDOMNodeId: number } | undefined;
+  };
 }
 
 const mouseClickTool: ToolExecutor = {
@@ -11,12 +14,13 @@ const mouseClickTool: ToolExecutor = {
     const selector = params.selector as string;
     if (!selector) throw new Error("mouse_click: selector is required");
 
-    await ctx.cdp.attach(await getTabId(params, ctx));
+    const tabId = await getTabId(params, ctx);
+    await ctx.cdp.attach(tabId);
 
     let cx: number, cy: number, tag: string, text: string;
 
     if (ctx.refs.isRef(selector)) {
-      ({ cx, cy, tag, text } = await getCoordsByRef(selector, ctx));
+      ({ cx, cy, tag, text } = await getCoordsByRef(selector, tabId, ctx));
     } else {
       ({ cx, cy, tag, text } = await getCoordsBySelector(selector, ctx));
     }
@@ -47,10 +51,11 @@ const mouseClickTool: ToolExecutor = {
 
 async function getCoordsByRef(
   ref: string,
+  tabId: number,
   ctx: ToolCtx,
 ): Promise<{ cx: number; cy: number; tag: string; text: string }> {
   const refName = ref.startsWith("@") ? ref.slice(1) : ref;
-  const entry = ctx.refs.get(refName);
+  const entry = ctx.refs.get(tabId, refName);
   if (!entry) throw new Error(`mouse_click: unknown ref "${ref}"`);
 
   const evalCtx = await ctx.cdp.send<{ executionContextId?: number }>("Runtime.evaluate", {

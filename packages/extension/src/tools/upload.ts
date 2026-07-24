@@ -10,12 +10,13 @@ registerTool({
     const paths = files ?? (filePath ? [filePath] : []);
     if (paths.length === 0) throw new Error("upload: filePath or files is required");
 
-    await ctx.cdp.attach(await getTabId(params, ctx));
+    const tabId = await getTabId(params, ctx);
+    await ctx.cdp.attach(tabId);
 
     let nodeId: number;
     if (ctx.refs.isRef(selector)) {
       const refName = selector.startsWith("@") ? selector.slice(1) : selector;
-      const entry = ctx.refs.get(refName);
+      const entry = ctx.refs.get(tabId, refName);
       if (!entry) throw new Error(`upload: unknown ref "${selector}"`);
       const result = await ctx.cdp.send<{ nodeIds: number[] }>("DOM.pushNodesByBackendIdsToFrontend", {
         backendNodeIds: [entry.backendDOMNodeId],

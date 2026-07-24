@@ -25,6 +25,7 @@ const navigateTool: ToolExecutor = {
     await ctx.cdp.attach(tabId);
     trackTab(tabId);
     await ctx.cdp.send("Page.navigate", { url });
+    ctx.refs.clear(tabId);
     await waitForLoad(tabId);
     return { success: true, url, tabId };
   },

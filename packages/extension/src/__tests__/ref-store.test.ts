@@ -9,8 +9,15 @@ describe("RefStore", () => {
   });
 
   it("should store and retrieve refs", () => {
-    store.set("e0", 123);
-    expect(store.get("e0")?.backendDOMNodeId).toBe(123);
+    store.set(1, "e0", 123);
+    expect(store.get(1, "e0")?.backendDOMNodeId).toBe(123);
+  });
+
+  it("should isolate refs by tab", () => {
+    store.set(1, "e0", 123);
+    store.set(2, "e0", 456);
+    expect(store.get(1, "e0")?.backendDOMNodeId).toBe(123);
+    expect(store.get(2, "e0")?.backendDOMNodeId).toBe(456);
   });
 
   it("should detect ref strings", () => {
@@ -26,13 +33,15 @@ describe("RefStore", () => {
   });
 
   it("should return undefined for unknown refs", () => {
-    expect(store.get("e999")).toBeUndefined();
+    expect(store.get(1, "e999")).toBeUndefined();
   });
 
-  it("should clear all refs", () => {
-    store.set("e0", 1);
-    store.set("e1", 2);
-    store.clear();
-    expect(store.size).toBe(0);
+  it("should clear refs for one tab", () => {
+    store.set(1, "e0", 1);
+    store.set(2, "e0", 2);
+    store.clear(1);
+    expect(store.get(1, "e0")).toBeUndefined();
+    expect(store.get(2, "e0")?.backendDOMNodeId).toBe(2);
+    expect(store.size).toBe(1);
   });
 });

@@ -69,11 +69,12 @@ const fillTool: ToolExecutor = {
     if (!selector) throw new Error("fill: selector is required");
     if (value == null) throw new Error("fill: value is required");
 
-    await ctx.cdp.attach(await getTabId(params, ctx));
+    const tabId = await getTabId(params, ctx);
+    await ctx.cdp.attach(tabId);
 
     if (ctx.refs.isRef(selector)) {
       const refName = selector.startsWith("@") ? selector.slice(1) : selector;
-      const entry = ctx.refs.get(refName);
+      const entry = ctx.refs.get(tabId, refName);
       if (!entry) throw new Error(`fill: unknown ref "${selector}"`);
 
       const evalCtx = await ctx.cdp.send<{ executionContextId?: number }>("Runtime.evaluate", {

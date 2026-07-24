@@ -7,8 +7,13 @@ export interface ToolContext {
 }
 
 export async function getTabId(params: Record<string, unknown>, ctx: ToolContext): Promise<number> {
-  const tabId = params._tabId as number | undefined;
-  if (tabId !== undefined) return tabId;
+  const tabId = params._tabId ?? params.tabId;
+  if (tabId !== undefined) {
+    if (typeof tabId !== "number" || !Number.isInteger(tabId) || tabId < 0) {
+      throw new Error("tabId must be a non-negative integer");
+    }
+    return tabId;
+  }
   const tab = await ctx.cdp.getActiveTab();
   return tab.id!;
 }
