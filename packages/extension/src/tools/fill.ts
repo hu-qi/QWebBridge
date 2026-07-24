@@ -1,4 +1,4 @@
-import { registerTool, resolveToolTarget, type ToolExecutor } from "./index.js";
+import { handleNodeResolutionError, registerTool, resolveToolTarget, type ToolExecutor } from "./index.js";
 
 function fillScript(targetExpr: string, value: string): string {
   const n = JSON.stringify(value);
@@ -69,10 +69,11 @@ const fillTool: ToolExecutor = {
     if (!selector) throw new Error("fill: selector is required");
     if (value == null) throw new Error("fill: value is required");
 
-    const { tabId, ref: resolvedRef } = await resolveToolTarget(params, ctx, selector);
+    const { tabId } = await resolveToolTarget(params, ctx, selector);
     return ctx.cdp.run(tabId, async (tab) => {
       if (ctx.refs.isRef(selector)) {
         const refName = selector.startsWith("@") ? selector.slice(1) : selector;
+        const resolvedRef = ctx.refs.resolve(selector, tabId);
         const entry = resolvedRef ?? ctx.refs.get(tabId, refName);
         if (!entry) throw new Error(`fill: unknown ref "${selector}"`);
 
@@ -88,7 +89,7 @@ const fillTool: ToolExecutor = {
           }));
         } catch (error) {
           if (!resolvedRef) throw error;
-          ctx.refs.rejectDetached(selector);
+          handleNodeResolutionError(error, selector, ctx.refs);
         }
         if (!object?.objectId) {
           if (resolvedRef) ctx.refs.rejectDetached(selector);

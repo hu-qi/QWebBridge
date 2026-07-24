@@ -1,6 +1,5 @@
-import { registerTool, type ToolExecutor } from "./index.js";
+import { handleNodeResolutionError, registerTool, type ToolExecutor } from "./index.js";
 import type { CDPTabSession } from "../cdp/controller.js";
-import type { ResolvedRef } from "../ref-store.js";
 import { resolveToolTarget } from "./index.js";
 
 interface ToolCtx {
@@ -8,6 +7,7 @@ interface ToolCtx {
   refs: {
     isRef: (s: string) => boolean;
     get: (tabId: number, ref: string) => { backendDOMNodeId: number } | undefined;
+    resolve: (ref: string, requestedTabId?: number) => { tabId: number; backendDOMNodeId: number } | undefined;
     rejectDetached: (ref: string) => never;
   };
 }
@@ -18,13 +18,13 @@ const mouseClickTool: ToolExecutor = {
     const selector = params.selector as string;
     if (!selector) throw new Error("mouse_click: selector is required");
 
-    const { tabId, ref: resolvedRef } = await resolveToolTarget(params, ctx, selector);
+    const { tabId } = await resolveToolTarget(params, ctx, selector);
     return ctx.cdp.run(tabId, async (tab) => {
       let cx: number, cy: number, tag: string, text: string;
       const toolCtx = { tab, refs: ctx.refs };
 
       if (ctx.refs.isRef(selector)) {
-        ({ cx, cy, tag, text } = await getCoordsByRef(selector, tabId, toolCtx, resolvedRef));
+        ({ cx, cy, tag, text } = await getCoordsByRef(selector, tabId, toolCtx));
       } else {
         ({ cx, cy, tag, text } = await getCoordsBySelector(selector, toolCtx));
       }
@@ -58,9 +58,9 @@ async function getCoordsByRef(
   ref: string,
   tabId: number,
   ctx: ToolCtx,
-  resolvedRef?: ResolvedRef,
 ): Promise<{ cx: number; cy: number; tag: string; text: string }> {
   const refName = ref.startsWith("@") ? ref.slice(1) : ref;
+  const resolvedRef = ctx.refs.resolve(ref, tabId);
   const entry = resolvedRef ?? ctx.refs.get(tabId, refName);
   if (!entry) throw new Error(`mouse_click: unknown ref "${ref}"`);
 
@@ -76,7 +76,7 @@ async function getCoordsByRef(
     }));
   } catch (error) {
     if (!resolvedRef) throw error;
-    ctx.refs.rejectDetached(ref);
+    handleNodeResolutionError(error, ref, ctx.refs);
   }
   if (!object?.objectId) {
     if (resolvedRef) ctx.refs.rejectDetached(ref);

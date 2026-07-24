@@ -54,14 +54,21 @@ export class RefStore {
     return token;
   }
 
+  getOwningTab(ref: string, requestedTabId?: number): number | undefined {
+    const tokenParts = this.parseOpaqueRef(ref);
+    const tabId = this.opaqueRefs.get(ref)?.tabId ?? this.tombstones.get(ref)?.tabId;
+    if (tabId === undefined) {
+      if (tokenParts) {
+        throw new ToolError(ERROR_CODES.UNKNOWN_REF, `Unknown ref "${ref}".`);
+      }
+      return undefined;
+    }
+    this.rejectTabMismatch(tabId, requestedTabId);
+    return tabId;
+  }
+
   resolve(ref: string, requestedTabId?: number): ResolvedRef | undefined {
-    const tokenParts = OPAQUE_REF_PATTERN.exec(ref);
-    if (ref.startsWith("@qref") && !tokenParts) {
-      throw new ToolError(ERROR_CODES.INVALID_REF, `Invalid ref "${ref}".`);
-    }
-    if (tokenParts && tokenParts[1] !== this.runtimePrefix) {
-      throw new ToolError(ERROR_CODES.STALE_REF, "Ref belongs to an earlier service worker instance.");
-    }
+    const tokenParts = this.parseOpaqueRef(ref);
 
     const tombstone = this.tombstones.get(ref);
     if (tombstone) {
@@ -75,12 +82,7 @@ export class RefStore {
       }
       return undefined;
     }
-    if (requestedTabId !== undefined && requestedTabId !== entry.tabId) {
-      throw new ToolError(
-        ERROR_CODES.REF_TAB_MISMATCH,
-        `Ref belongs to tab ${entry.tabId}, but tab ${requestedTabId} was requested.`,
-      );
-    }
+    this.rejectTabMismatch(entry.tabId, requestedTabId);
     return {
       tabId: entry.tabId,
       backendDOMNodeId: entry.backendDOMNodeId,
@@ -166,6 +168,26 @@ export class RefStore {
       const oldestToken = this.tombstones.keys().next().value as string | undefined;
       if (!oldestToken) break;
       this.tombstones.delete(oldestToken);
+    }
+  }
+
+  private parseOpaqueRef(ref: string): RegExpExecArray | null {
+    const tokenParts = OPAQUE_REF_PATTERN.exec(ref);
+    if (ref.startsWith("@qref") && !tokenParts) {
+      throw new ToolError(ERROR_CODES.INVALID_REF, `Invalid ref "${ref}".`);
+    }
+    if (tokenParts && tokenParts[1] !== this.runtimePrefix) {
+      throw new ToolError(ERROR_CODES.STALE_REF, "Ref belongs to an earlier service worker instance.");
+    }
+    return tokenParts;
+  }
+
+  private rejectTabMismatch(tabId: number, requestedTabId?: number): void {
+    if (requestedTabId !== undefined && requestedTabId !== tabId) {
+      throw new ToolError(
+        ERROR_CODES.REF_TAB_MISMATCH,
+        `Ref belongs to tab ${tabId}, but tab ${requestedTabId} was requested.`,
+      );
     }
   }
 

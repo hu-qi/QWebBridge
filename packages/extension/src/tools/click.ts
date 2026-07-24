@@ -1,6 +1,11 @@
 import type { CDPTabSession } from "../cdp/controller.js";
-import type { ResolvedRef } from "../ref-store.js";
-import { registerTool, resolveToolTarget, type ToolExecutor, type ToolContext } from "./index.js";
+import {
+  handleNodeResolutionError,
+  registerTool,
+  resolveToolTarget,
+  type ToolExecutor,
+  type ToolContext,
+} from "./index.js";
 
 const clickTool: ToolExecutor = {
   name: "click",
@@ -8,10 +13,10 @@ const clickTool: ToolExecutor = {
     const selector = params.selector as string;
     if (!selector) throw new Error("click: selector is required");
 
-    const { tabId, ref: resolvedRef } = await resolveToolTarget(params, ctx, selector);
+    const { tabId } = await resolveToolTarget(params, ctx, selector);
     return ctx.cdp.run(tabId, (tab) => {
       if (ctx.refs.isRef(selector)) {
-        return clickByRef(selector, tabId, tab, ctx, resolvedRef);
+        return clickByRef(selector, tabId, tab, ctx);
       }
       return clickBySelector(selector, tab);
     });
@@ -31,14 +36,9 @@ async function getExecutionContextId(tab: CDPTabSession): Promise<number> {
   return pageCtx?.id ?? 1;
 }
 
-async function clickByRef(
-  ref: string,
-  tabId: number,
-  tab: CDPTabSession,
-  ctx: ToolContext,
-  resolvedRef?: ResolvedRef,
-): Promise<unknown> {
+async function clickByRef(ref: string, tabId: number, tab: CDPTabSession, ctx: ToolContext): Promise<unknown> {
   const refName = ref.startsWith("@") ? ref.slice(1) : ref;
+  const resolvedRef = ctx.refs.resolve(ref, tabId);
   const entry = resolvedRef ?? ctx.refs.get(tabId, refName);
   if (!entry) throw new Error(`click: unknown ref "${ref}". Run snapshot first to get refs.`);
 
@@ -52,7 +52,7 @@ async function clickByRef(
     });
   } catch (error) {
     if (!resolvedRef) throw error;
-    ctx.refs.rejectDetached(ref);
+    handleNodeResolutionError(error, ref, ctx.refs);
   }
 
   if (!resolveResult.object?.objectId) {

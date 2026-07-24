@@ -1,4 +1,4 @@
-import { registerTool, resolveToolTarget } from "./index.js";
+import { handleNodeResolutionError, registerTool, resolveToolTarget } from "./index.js";
 
 registerTool({
   name: "upload",
@@ -10,11 +10,12 @@ registerTool({
     const paths = files ?? (filePath ? [filePath] : []);
     if (paths.length === 0) throw new Error("upload: filePath or files is required");
 
-    const { tabId, ref: resolvedRef } = await resolveToolTarget(params, ctx, selector);
+    const { tabId } = await resolveToolTarget(params, ctx, selector);
     return ctx.cdp.run(tabId, async (tab) => {
       let nodeId: number;
       if (ctx.refs.isRef(selector)) {
         const refName = selector.startsWith("@") ? selector.slice(1) : selector;
+        const resolvedRef = ctx.refs.resolve(selector, tabId);
         const entry = resolvedRef ?? ctx.refs.get(tabId, refName);
         if (!entry) throw new Error(`upload: unknown ref "${selector}"`);
         let result: { nodeIds: number[] } | undefined;
@@ -24,7 +25,7 @@ registerTool({
           });
         } catch (error) {
           if (!resolvedRef) throw error;
-          ctx.refs.rejectDetached(selector);
+          handleNodeResolutionError(error, selector, ctx.refs);
         }
         if (!result?.nodeIds || result.nodeIds.length === 0) {
           if (resolvedRef) ctx.refs.rejectDetached(selector);

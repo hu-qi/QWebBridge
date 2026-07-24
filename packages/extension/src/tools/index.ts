@@ -1,5 +1,5 @@
 import type { CDPController } from "../cdp/controller.js";
-import type { RefStore, ResolvedRef } from "../ref-store.js";
+import type { RefStore } from "../ref-store.js";
 import { ERROR_CODES } from "@qweb/protocol";
 import { ToolError } from "../tool-error.js";
 
@@ -30,17 +30,26 @@ export async function resolveToolTarget(
   params: Record<string, unknown>,
   ctx: ToolContext,
   selector?: string,
-): Promise<{ tabId: number; ref?: ResolvedRef }> {
+): Promise<{ tabId: number }> {
   if (selector && ctx.refs.isRef(selector)) {
     const requestedTabId = getExplicitTabId(params);
-    const ref = ctx.refs.resolve(selector, requestedTabId);
-    if (ref) return { tabId: ref.tabId, ref };
+    const owningTabId = ctx.refs.getOwningTab(selector, requestedTabId);
+    if (owningTabId !== undefined) return { tabId: owningTabId };
     if (requestedTabId === undefined) {
       throw new ToolError(ERROR_CODES.INVALID_PARAMS, "Legacy refs require an explicit tabId.");
     }
     return { tabId: requestedTabId };
   }
   return { tabId: await getTabId(params, ctx) };
+}
+
+export function handleNodeResolutionError(error: unknown, ref: string, refs: Pick<RefStore, "rejectDetached">): never {
+  if (error instanceof ToolError) throw error;
+  const message = error instanceof Error ? error.message : String(error);
+  if (message.includes("No node with given id found") || message.includes("Could not find node with given id")) {
+    refs.rejectDetached(ref);
+  }
+  throw error;
 }
 
 export interface ToolExecutor {

@@ -189,6 +189,65 @@ it("routes an opaque snapshot ref without an explicit tabId", async () => {
   expect(resolvedNodes).toEqual([{ tabId: 1, backendNodeId: 101 }]);
 });
 
+it("rejects a ref invalidated by an earlier queued snapshot", async () => {
+  const refs = new RefStore();
+  const oldRef = refs.issue(1, 101);
+  const snapshotStarted = deferred();
+  const releaseSnapshot = deferred();
+  let tail = Promise.resolve<unknown>(undefined);
+  const cdp = {
+    run<T>(
+      tabId: number,
+      operation: (tab: {
+        tabId: number;
+        send<R>(method: string, params?: Record<string, unknown>): Promise<R>;
+      }) => Promise<T>,
+    ): Promise<T> {
+      const result = tail.then(() =>
+        operation({
+          tabId,
+          async send<R>(method: string): Promise<R> {
+            if (method === "Accessibility.getFullAXTree") {
+              snapshotStarted.resolve();
+              await releaseSnapshot.promise;
+              return {
+                nodes: [{ nodeId: 1, backendDOMNodeId: 202, role: { value: "button" } }],
+              } as R;
+            }
+            if (method === "Runtime.evaluate") {
+              return { result: { type: "number", value: 1 }, executionContextId: 1 } as R;
+            }
+            if (method === "DOM.resolveNode") {
+              return { object: { objectId: "old-node" } } as R;
+            }
+            if (method === "Runtime.callFunctionOn") {
+              return { result: { value: { success: true } } } as R;
+            }
+            return {} as R;
+          },
+        }),
+      );
+      tail = result.then(
+        () => undefined,
+        () => undefined,
+      );
+      return result;
+    },
+    async getActiveTab() {
+      return { id: 1 };
+    },
+  };
+  const ctx = { cdp, refs } as unknown as ToolContext;
+
+  const snapshot = getTool("snapshot")!.execute({ tabId: 1 }, ctx);
+  await snapshotStarted.promise;
+  const click = getTool("click")!.execute({ selector: oldRef }, ctx);
+  releaseSnapshot.resolve();
+
+  await snapshot;
+  await expect(click).rejects.toMatchObject({ code: ERROR_CODES.STALE_REF });
+});
+
 it.each([
   ["click", { tabId: 1, selector: "@e0" }],
   ["fill", { tabId: 1, selector: "@e0", value: "text" }],
@@ -279,6 +338,44 @@ it.each([
       code: "node_detached",
     }),
   );
+});
+
+it.each([
+  ["click", { selector: "" }, ERROR_CODES.TAB_CLOSED],
+  ["click", { selector: "" }, ERROR_CODES.OPERATION_ABORTED],
+  ["fill", { selector: "", value: "text" }, ERROR_CODES.TAB_CLOSED],
+  ["fill", { selector: "", value: "text" }, ERROR_CODES.OPERATION_ABORTED],
+  ["mouse_click", { selector: "" }, ERROR_CODES.TAB_CLOSED],
+  ["mouse_click", { selector: "" }, ERROR_CODES.OPERATION_ABORTED],
+  ["upload", { selector: "", files: ["/tmp/input.txt"] }, ERROR_CODES.TAB_CLOSED],
+  ["upload", { selector: "", files: ["/tmp/input.txt"] }, ERROR_CODES.OPERATION_ABORTED],
+])("%s preserves structured errors during node resolution", async (toolName, params, errorCode) => {
+  const refs = new RefStore();
+  const ref = refs.issue(1, 101);
+  const originalError = new ToolError(errorCode, `Original ${errorCode} error.`);
+  const cdp = {
+    async run<T>(
+      tabId: number,
+      operation: (tab: { tabId: number; send<R>(method: string): Promise<R> }) => Promise<T>,
+    ): Promise<T> {
+      return operation({
+        tabId,
+        async send<R>(method: string): Promise<R> {
+          if (method === "Runtime.evaluate") {
+            return { result: { type: "number", value: 1 }, executionContextId: 1 } as R;
+          }
+          if (method === "DOM.resolveNode" || method === "DOM.pushNodesByBackendIdsToFrontend") {
+            throw originalError;
+          }
+          return {} as R;
+        },
+      });
+    },
+  };
+  const ctx = { cdp, refs } as unknown as ToolContext;
+
+  await expect(getTool(toolName)!.execute({ ...params, selector: ref }, ctx)).rejects.toBe(originalError);
+  expect(refs.resolve(ref)).toMatchObject({ tabId: 1, backendDOMNodeId: 101 });
 });
 
 it("stores wait_for refs for the requested tab", async () => {
