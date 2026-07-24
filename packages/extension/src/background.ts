@@ -179,11 +179,9 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
 });
 
 chrome.debugger.onDetach.addListener(({ tabId }) => {
-  if (tabId) {
+  if (typeof tabId === "number") {
     refs.clear(tabId);
-    try {
-      cdp.detach(tabId);
-    } catch {}
+    void cdp.detach(tabId);
   }
 });
 
