@@ -52,7 +52,7 @@ Response: `{ "success": true, "result": { ... } }`
 
 | Tool | Params | Returns | Note |
 |------|--------|---------|------|
-| `navigate` | `url`, `newTab`(bool), `group_title`, `_session` | `{success, url, tabId}` | Always use `newTab:true` on first call. `_session` controls tab group color isolation |
+| `navigate` | `url`, `tabId`, `newTab`(bool), `group_title`, `_session` | `{success, url, tabId}` | Always use `newTab:true` on first call. `tabId` selects an existing tab |
 | `find_tab` | `url_contains`, `active`(bool), `_tabId` | `{tabId, url, title}` | **Reuse an open tab.** `url_contains` matches domain substring. `active:true` picks the user's current tab |
 | `snapshot` | `tabId`, `roles`, `name_contains`, `depth`, `interactive_only` | tree with `@e` refs | **Accessibility tree** — use filters on complex SPAs |
 | `multi_snapshot` | `tabIds`, plus snapshot filters | `{results:[{tabId, tree}]}` | Batch snapshots for several tabs in one call |
@@ -77,9 +77,9 @@ Response: `{ "success": true, "result": { ... } }`
 ### Tab-scoped refs
 
 Refs are scoped to one browser tab.
-After `multi_snapshot`, always pass the matching `tabId` with an `@eN` ref.
+Whenever consuming an `@eN` ref, pass the `tabId` of the snapshot that produced it.
 Each result pairs one `tabId` with its snapshot tree.
-Omit `tabId` only in a single-tab workflow.
+Do not rely on the extension's current tab state.
 
 ```json
 {"tabIds":[1,2]}
