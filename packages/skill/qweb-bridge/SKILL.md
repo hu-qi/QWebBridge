@@ -54,25 +54,42 @@ Response: `{ "success": true, "result": { ... } }`
 |------|--------|---------|------|
 | `navigate` | `url`, `newTab`(bool), `group_title`, `_session` | `{success, url, tabId}` | Always use `newTab:true` on first call. `_session` controls tab group color isolation |
 | `find_tab` | `url_contains`, `active`(bool), `_tabId` | `{tabId, url, title}` | **Reuse an open tab.** `url_contains` matches domain substring. `active:true` picks the user's current tab |
-| `snapshot` | `roles`, `name_contains`, `depth`, `interactive_only` | tree with `@e` refs | **Accessibility tree** — use filters on complex SPAs |
+| `snapshot` | `tabId`, `roles`, `name_contains`, `depth`, `interactive_only` | tree with `@e` refs | **Accessibility tree** — use filters on complex SPAs |
 | `multi_snapshot` | `tabIds`, plus snapshot filters | `{results:[{tabId, tree}]}` | Batch snapshots for several tabs in one call |
-| `click` | `selector` (@e ref or CSS) | `{success, tag, text}` | Synthetic `el.click()`. Use `@eN` refs from snapshot when possible |
-| `mouse_click` | `selector` (@e ref or CSS) | `{success, x, y, tag, text}` | Dispatches JS `MouseEvent` at element center. Works on `<a>` links. |
-| `fill` | `selector`, `value`, `submit` | `{success, tag, mode, submitted}` | Works on `<input>` / `<textarea>` AND `[contenteditable]`; `submit:true` sends Enter |
+| `click` | `selector` (@e ref or CSS), `tabId` | `{success, tag, text}` | Synthetic `el.click()`. Use `@eN` refs from snapshot when possible |
+| `mouse_click` | `selector` (@e ref or CSS), `tabId` | `{success, x, y, tag, text}` | Dispatches JS `MouseEvent` at element center. Works on `<a>` links. |
+| `fill` | `selector`, `value`, `tabId`, `submit` | `{success, tag, mode, submitted}` | Works on `<input>` / `<textarea>` AND `[contenteditable]`; `submit:true` sends Enter |
 | `evaluate` | `code`, `parse_json`, `structured` | JS value or `{value,type}` | Use `structured:true` to distinguish empty/null/undefined; `parse_json:true` parses JSON strings |
 | `batch_eval` | `tabIds`, `code`, `parse_json`, `structured` | `{results:[{tabId,value}]}` | Evaluate the same JS across multiple tabs |
 | `screenshot` | `format`(png\|jpeg), `quality`(0-100) | `{format, dataLength, data}` (base64) | **Use helper script** (`scripts/screenshot.sh`) to avoid base64 flooding context |
 | `network` | `cmd`(start\|stop\|list\|detail), `filter` | request/response data | |
 | `key_type` | `text` | `{success}` | Types text one char at a time via Chrome CDP `Input.insertText` |
 | `send_keys` | `keys` (e.g. `"Escape"`, `"Control+A"`) | `{success}` | Sends keyboard shortcut via CDP `Input.dispatchKeyEvent` |
-| `wait_for` | `selector`, `text`, `state`, `timeout` | `{success, found, ref, elapsed_ms}` | Waits for visible/hidden/removed elements |
+| `wait_for` | `selector`, `tabId`, `text`, `state`, `timeout` | `{success, found, ref, elapsed_ms}` | Waits for visible/hidden/removed elements |
 | `streaming_status` | `selector` | `{isStreaming, hasPendingAuth, url, title}` | Detects ChatGPT-style streaming and pending auth buttons |
-| `upload` | `selector`, `files`(string[]) | `{success, fileCount}` | Upload files to a file input |
+| `upload` | `selector`, `tabId`, `files`(string[]) | `{success, fileCount}` | Upload files to a file input |
 | `save_as_pdf` | `format`, `landscape`, `scale`, `print_background` | `{data}` (base64 PDF) | |
 | `list_tabs` | — | `{tabs: [{tabId, url, title, active}]}` | |
 | `close_tab` | `_tabId` | `{success}` | |
 | `close_session` | `_session`, `_tabIds` | `{success}` | Call at task end to clean up. `_session` closes all tabs in that group |
 | `status` | — | `{running, port, extensions_connected, uptime_seconds}` | Call `/health` endpoint |
+
+### Tab-scoped refs
+
+Refs are scoped to one browser tab.
+After `multi_snapshot`, always pass the matching `tabId` with an `@eN` ref.
+Each result pairs one `tabId` with its snapshot tree.
+Omit `tabId` only in a single-tab workflow.
+
+```json
+{"tabIds":[1,2]}
+```
+
+Use a ref from tab 1:
+
+```json
+{"tabId":1,"selector":"@e0"}
+```
 
 ### Using find_tab
 
