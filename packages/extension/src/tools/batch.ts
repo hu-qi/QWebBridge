@@ -1,6 +1,7 @@
 import { registerTool, type ToolExecutor } from "./index.js";
 import { evaluateTool } from "./evaluate.js";
 import { snapshotTool } from "./snapshot.js";
+import { toErrorDetail } from "../tool-error.js";
 
 const multiSnapshotTool: ToolExecutor = {
   name: "multi_snapshot",
@@ -10,16 +11,17 @@ const multiSnapshotTool: ToolExecutor = {
       throw new Error("multi_snapshot: tabIds is required");
     }
 
-    const results = [];
-    for (const tabId of tabIds) {
-      try {
-        const tree = await snapshotTool.execute({ ...params, _tabId: tabId }, ctx);
-        results.push({ tabId, tree });
-      } catch (err) {
-        const error = err instanceof Error ? err.message : String(err);
-        results.push({ tabId, error });
-      }
-    }
+    const results = await Promise.all(
+      tabIds.map(async (tabId) => {
+        try {
+          const tree = await snapshotTool.execute({ ...params, _tabId: tabId }, ctx);
+          return { tabId, tree };
+        } catch (err) {
+          const error = toErrorDetail(err);
+          return { tabId, error: error.message, errorCode: error.code };
+        }
+      }),
+    );
     return { results };
   },
 };
@@ -34,16 +36,17 @@ const batchEvalTool: ToolExecutor = {
     }
     if (!code) throw new Error("batch_eval: code is required");
 
-    const results = [];
-    for (const tabId of tabIds) {
-      try {
-        const value = await evaluateTool.execute({ ...params, _tabId: tabId }, ctx);
-        results.push({ tabId, value });
-      } catch (err) {
-        const error = err instanceof Error ? err.message : String(err);
-        results.push({ tabId, error });
-      }
-    }
+    const results = await Promise.all(
+      tabIds.map(async (tabId) => {
+        try {
+          const value = await evaluateTool.execute({ ...params, _tabId: tabId }, ctx);
+          return { tabId, value };
+        } catch (err) {
+          const error = toErrorDetail(err);
+          return { tabId, error: error.message, errorCode: error.code };
+        }
+      }),
+    );
     return { results };
   },
 };

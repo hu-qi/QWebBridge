@@ -83,93 +83,86 @@ export const snapshotTool: ToolExecutor = {
     if (tabId === undefined || tabId === null) {
       throw new Error("snapshot: getTabId returned invalid: " + JSON.stringify({ params, tabId }));
     }
-    try {
-      await ctx.cdp.attach(tabId);
-    } catch (e) {
-      throw new Error(`snapshot: attach failed: ${e instanceof Error ? e.message : String(e)}`);
-    }
-
-    let result: GetFullAXTreeResult;
-    try {
-      await ctx.cdp.send("Accessibility.enable");
-    } catch {}
-    try {
-      result = await ctx.cdp.send<GetFullAXTreeResult>("Accessibility.getFullAXTree");
-    } catch (e) {
-      throw new Error(`snapshot CDP error: ${e instanceof Error ? e.message : String(e)}`);
-    }
-
-    ctx.refs.clear();
-    let refIndex = 0;
-
-    const nodeMap = new Map<number, AXNode>();
-    for (const node of result.nodes) {
-      nodeMap.set(node.nodeId, node);
-    }
-
-    function buildElement(node: AXNode): SnapshotElement | null {
-      const role = node.role?.value || "";
-
-      if ((role === "none" || role === "generic") && node.childIds && node.childIds.length > 0) {
-        const children: SnapshotElement[] = [];
-        for (const childId of node.childIds) {
-          const child = nodeMap.get(childId);
-          if (child) {
-            const childEl = buildElement(child);
-            if (childEl) children.push(childEl);
-          }
-        }
-        if (children.length === 0) return null;
-        if (children.length === 1) return children[0];
-        const groupRef = `e${refIndex++}`;
-        ctx.refs.set(groupRef, node.backendDOMNodeId);
-        return { role: "group", ref: `@${groupRef}`, children };
+    return ctx.cdp.run(tabId, async (tab) => {
+      let result: GetFullAXTreeResult;
+      try {
+        await tab.send("Accessibility.enable");
+      } catch {}
+      try {
+        result = await tab.send<GetFullAXTreeResult>("Accessibility.getFullAXTree");
+      } catch (error) {
+        throw new Error(`snapshot CDP error: ${error instanceof Error ? error.message : String(error)}`);
       }
 
-      const ref = `e${refIndex++}`;
-      ctx.refs.set(ref, node.backendDOMNodeId);
+      ctx.refs.beginSnapshot(tabId);
 
-      const element: SnapshotElement = {
-        role,
-        name: node.name?.value,
-        value: node.value?.value,
-        ref: `@${ref}`,
-        children: [],
-      };
+      const nodeMap = new Map<number, AXNode>();
+      for (const node of result.nodes) {
+        nodeMap.set(node.nodeId, node);
+      }
 
-      if (node.childIds) {
-        for (const childId of node.childIds) {
-          const child = nodeMap.get(childId);
-          if (child) {
-            const childEl = buildElement(child);
-            if (childEl) {
-              element.children!.push(childEl);
+      function buildElement(node: AXNode): SnapshotElement | null {
+        const role = node.role?.value || "";
+
+        if ((role === "none" || role === "generic") && node.childIds && node.childIds.length > 0) {
+          const children: SnapshotElement[] = [];
+          for (const childId of node.childIds) {
+            const child = nodeMap.get(childId);
+            if (child) {
+              const childEl = buildElement(child);
+              if (childEl) children.push(childEl);
+            }
+          }
+          if (children.length === 0) return null;
+          if (children.length === 1) return children[0];
+          const groupRef = ctx.refs.issue(tabId, node.backendDOMNodeId);
+          return { role: "group", ref: groupRef, children };
+        }
+
+        const ref = ctx.refs.issue(tabId, node.backendDOMNodeId);
+
+        const element: SnapshotElement = {
+          role,
+          name: node.name?.value,
+          value: node.value?.value,
+          ref,
+          children: [],
+        };
+
+        if (node.childIds) {
+          for (const childId of node.childIds) {
+            const child = nodeMap.get(childId);
+            if (child) {
+              const childEl = buildElement(child);
+              if (childEl) {
+                element.children!.push(childEl);
+              }
             }
           }
         }
+
+        return element;
       }
 
-      return element;
-    }
-
-    const hasParent = new Set<number>();
-    for (const node of result.nodes) {
-      if (node.childIds) {
-        for (const childId of node.childIds) {
-          hasParent.add(childId);
+      const hasParent = new Set<number>();
+      for (const node of result.nodes) {
+        if (node.childIds) {
+          for (const childId of node.childIds) {
+            hasParent.add(childId);
+          }
         }
       }
-    }
 
-    const roots: SnapshotElement[] = [];
-    for (const node of result.nodes) {
-      if (!hasParent.has(node.nodeId)) {
-        const el = buildElement(node);
-        if (el) roots.push(el);
+      const roots: SnapshotElement[] = [];
+      for (const node of result.nodes) {
+        if (!hasParent.has(node.nodeId)) {
+          const element = buildElement(node);
+          if (element) roots.push(element);
+        }
       }
-    }
 
-    return filterSnapshotTree(roots, params);
+      return filterSnapshotTree(roots, params);
+    });
   },
 };
 

@@ -13,20 +13,24 @@ const navigateTool: ToolExecutor = {
 
     if (newTab) {
       const tab = await chrome.tabs.create({ url, active: true });
+      ctx.cdp.open(tab.id!);
       const agentSession = session || "default";
       await groupTab(tab.id!, agentSession, groupTitle);
-      await ctx.cdp.attach(tab.id!);
-      trackTab(tab.id!);
-      await waitForLoad(tab.id!);
-      return { success: true, url, tabId: tab.id! };
+      return ctx.cdp.run(tab.id!, async () => {
+        trackTab(tab.id!);
+        await waitForLoad(tab.id!);
+        return { success: true, url, tabId: tab.id! };
+      });
     }
 
     const tabId = await getTabId(params, ctx);
-    await ctx.cdp.attach(tabId);
-    trackTab(tabId);
-    await ctx.cdp.send("Page.navigate", { url });
-    await waitForLoad(tabId);
-    return { success: true, url, tabId };
+    return ctx.cdp.run(tabId, async (tab) => {
+      trackTab(tabId);
+      await tab.send("Page.navigate", { url });
+      ctx.refs.clear(tabId);
+      await waitForLoad(tabId);
+      return { success: true, url, tabId };
+    });
   },
 };
 

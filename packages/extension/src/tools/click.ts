@@ -1,4 +1,11 @@
-import { registerTool, getTabId, type ToolExecutor, type ToolContext } from "./index.js";
+import type { CDPTabSession } from "../cdp/controller.js";
+import {
+  handleNodeResolutionError,
+  registerTool,
+  resolveToolTarget,
+  type ToolExecutor,
+  type ToolContext,
+} from "./index.js";
 
 const clickTool: ToolExecutor = {
   name: "click",
@@ -6,43 +13,54 @@ const clickTool: ToolExecutor = {
     const selector = params.selector as string;
     if (!selector) throw new Error("click: selector is required");
 
-    await ctx.cdp.attach(await getTabId(params, ctx));
-
-    if (ctx.refs.isRef(selector)) {
-      return clickByRef(selector, ctx);
-    }
-    return clickBySelector(selector, ctx);
+    const { tabId } = await resolveToolTarget(params, ctx, selector);
+    return ctx.cdp.run(tabId, (tab) => {
+      if (ctx.refs.isRef(selector)) {
+        return clickByRef(selector, tabId, tab, ctx);
+      }
+      return clickBySelector(selector, tab);
+    });
   },
 };
 
-async function getExecutionContextId(ctx: ToolContext): Promise<number> {
-  const result = await ctx.cdp.send<{ result: { type: string }; executionContextId?: number }>("Runtime.evaluate", {
+async function getExecutionContextId(tab: CDPTabSession): Promise<number> {
+  const result = await tab.send<{ result: { type: string }; executionContextId?: number }>("Runtime.evaluate", {
     expression: "1",
     returnByValue: true,
   });
   if (result.executionContextId) return result.executionContextId;
-  const contexts = await ctx.cdp
+  const contexts = await tab
     .send<{ contexts: { id: number; origin: string; name: string }[] }>("Runtime.executionContexts")
     .catch(() => ({ contexts: [] }));
   const pageCtx = contexts.contexts?.find((c: { origin: string; name: string }) => !c.origin.startsWith("chrome"));
   return pageCtx?.id ?? 1;
 }
 
-async function clickByRef(ref: string, ctx: ToolContext): Promise<unknown> {
+async function clickByRef(ref: string, tabId: number, tab: CDPTabSession, ctx: ToolContext): Promise<unknown> {
   const refName = ref.startsWith("@") ? ref.slice(1) : ref;
-  const entry = ctx.refs.get(refName);
+  const resolvedRef = ctx.refs.resolve(ref, tabId);
+  const entry = resolvedRef ?? ctx.refs.get(tabId, refName);
   if (!entry) throw new Error(`click: unknown ref "${ref}". Run snapshot first to get refs.`);
 
-  const contextId = await getExecutionContextId(ctx);
+  const contextId = await getExecutionContextId(tab);
 
-  const resolveResult = await ctx.cdp.send<{ object: { objectId: string } }>("DOM.resolveNode", {
-    backendNodeId: entry.backendDOMNodeId,
-    executionContextId: contextId,
-  });
+  let resolveResult: { object: { objectId: string } };
+  try {
+    resolveResult = await tab.send<{ object: { objectId: string } }>("DOM.resolveNode", {
+      backendNodeId: entry.backendDOMNodeId,
+      executionContextId: contextId,
+    });
+  } catch (error) {
+    if (!resolvedRef) throw error;
+    handleNodeResolutionError(error, ref, ctx.refs);
+  }
 
-  if (!resolveResult.object?.objectId) throw new Error(`click: could not resolve ref "${ref}"`);
+  if (!resolveResult.object?.objectId) {
+    if (resolvedRef) ctx.refs.rejectDetached(ref);
+    throw new Error(`click: could not resolve ref "${ref}"`);
+  }
 
-  const result = await ctx.cdp.send<{ result: { value: unknown }; exceptionDetails?: { text: string } }>(
+  const result = await tab.send<{ result: { value: unknown }; exceptionDetails?: { text: string } }>(
     "Runtime.callFunctionOn",
     {
       objectId: resolveResult.object.objectId,
@@ -59,8 +77,8 @@ async function clickByRef(ref: string, ctx: ToolContext): Promise<unknown> {
   return result.result.value || { success: true };
 }
 
-async function clickBySelector(selector: string, ctx: ToolContext): Promise<unknown> {
-  const result = await ctx.cdp.send<{ result: { value: unknown }; exceptionDetails?: { text: string } }>(
+async function clickBySelector(selector: string, tab: CDPTabSession): Promise<unknown> {
+  const result = await tab.send<{ result: { value: unknown }; exceptionDetails?: { text: string } }>(
     "Runtime.evaluate",
     {
       expression: `(() => {

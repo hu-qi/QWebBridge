@@ -37,8 +37,16 @@ describe("Constants", () => {
     expect(TOOL_NAMES).toContain("save_as_pdf");
   });
 
-  it("should define all error codes", () => {
-    expect(Object.keys(ERROR_CODES)).toHaveLength(13);
+  it("should define ref lifecycle error codes", () => {
+    expect(ERROR_CODES).toMatchObject({
+      INVALID_REF: "invalid_ref",
+      STALE_REF: "stale_ref",
+      UNKNOWN_REF: "unknown_ref",
+      REF_TAB_MISMATCH: "ref_tab_mismatch",
+      TAB_CLOSED: "tab_closed",
+      NODE_DETACHED: "node_detached",
+      OPERATION_ABORTED: "operation_aborted",
+    });
   });
 
   it("should use correct port", () => {

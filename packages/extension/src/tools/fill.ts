@@ -1,4 +1,4 @@
-import { registerTool, getTabId, type ToolExecutor } from "./index.js";
+import { handleNodeResolutionError, registerTool, resolveToolTarget, type ToolExecutor } from "./index.js";
 
 function fillScript(targetExpr: string, value: string): string {
   const n = JSON.stringify(value);
@@ -69,39 +69,50 @@ const fillTool: ToolExecutor = {
     if (!selector) throw new Error("fill: selector is required");
     if (value == null) throw new Error("fill: value is required");
 
-    await ctx.cdp.attach(await getTabId(params, ctx));
+    const { tabId } = await resolveToolTarget(params, ctx, selector);
+    return ctx.cdp.run(tabId, async (tab) => {
+      if (ctx.refs.isRef(selector)) {
+        const refName = selector.startsWith("@") ? selector.slice(1) : selector;
+        const resolvedRef = ctx.refs.resolve(selector, tabId);
+        const entry = resolvedRef ?? ctx.refs.get(tabId, refName);
+        if (!entry) throw new Error(`fill: unknown ref "${selector}"`);
 
-    if (ctx.refs.isRef(selector)) {
-      const refName = selector.startsWith("@") ? selector.slice(1) : selector;
-      const entry = ctx.refs.get(refName);
-      if (!entry) throw new Error(`fill: unknown ref "${selector}"`);
+        const evalCtx = await tab.send<{ executionContextId?: number }>("Runtime.evaluate", {
+          expression: "1",
+          returnByValue: true,
+        });
+        let object: { objectId: string } | undefined;
+        try {
+          ({ object } = await tab.send<{ object: { objectId: string } }>("DOM.resolveNode", {
+            backendNodeId: entry.backendDOMNodeId,
+            executionContextId: evalCtx.executionContextId ?? 1,
+          }));
+        } catch (error) {
+          if (!resolvedRef) throw error;
+          handleNodeResolutionError(error, selector, ctx.refs);
+        }
+        if (!object?.objectId) {
+          if (resolvedRef) ctx.refs.rejectDetached(selector);
+          throw new Error("fill: could not resolve ref");
+        }
 
-      const evalCtx = await ctx.cdp.send<{ executionContextId?: number }>("Runtime.evaluate", {
-        expression: "1",
-        returnByValue: true,
-      });
-      const { object } = await ctx.cdp.send<{ object: { objectId: string } }>("DOM.resolveNode", {
-        backendNodeId: entry.backendDOMNodeId,
-        executionContextId: evalCtx.executionContextId ?? 1,
-      });
-      if (!object?.objectId) throw new Error("fill: could not resolve ref");
-
-      const result = await ctx.cdp.send<{ result: { value: unknown }; exceptionDetails?: { text: string } }>(
-        "Runtime.callFunctionOn",
-        {
-          objectId: object.objectId,
-          functionDeclaration: `function() {
+        const result = await tab.send<{ result: { value: unknown }; exceptionDetails?: { text: string } }>(
+          "Runtime.callFunctionOn",
+          {
+            objectId: object.objectId,
+            functionDeclaration: `function() {
             const __result = (() => { ${fillScript("this", value)} })();
             ${submit ? submitScript("this") : ""}
             return { ...__result, submitted: ${JSON.stringify(submit)} };
           }`,
-          returnByValue: true,
-        },
-      );
-      if (result.exceptionDetails) throw new Error(`fill: ${result.exceptionDetails.text}`);
-      return result.result.value || { success: true };
-    } else {
-      const result = await ctx.cdp.send<{ result: { value: unknown }; exceptionDetails?: { text: string } }>(
+            returnByValue: true,
+          },
+        );
+        if (result.exceptionDetails) throw new Error(`fill: ${result.exceptionDetails.text}`);
+        return result.result.value || { success: true };
+      }
+
+      const result = await tab.send<{ result: { value: unknown }; exceptionDetails?: { text: string } }>(
         "Runtime.evaluate",
         {
           expression: `(() => {
@@ -118,7 +129,7 @@ const fillTool: ToolExecutor = {
       const val = result.result.value as { error?: string; success?: boolean; tag?: string; mode?: string };
       if (val?.error) throw new Error(val.error);
       return val || { success: true };
-    }
+    });
   },
 };
 

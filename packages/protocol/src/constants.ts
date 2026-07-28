@@ -37,6 +37,13 @@ export const ERROR_CODES = {
   PROTOCOL_ERROR: "protocol_error",
   REQUEST_TIMEOUT: "request_timeout",
   SAVE_PDF_FAILED: "save_pdf_failed",
+  INVALID_REF: "invalid_ref",
+  STALE_REF: "stale_ref",
+  UNKNOWN_REF: "unknown_ref",
+  REF_TAB_MISMATCH: "ref_tab_mismatch",
+  TAB_CLOSED: "tab_closed",
+  NODE_DETACHED: "node_detached",
+  OPERATION_ABORTED: "operation_aborted",
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];

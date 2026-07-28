@@ -1,6 +1,7 @@
 import { CDPController } from "./cdp/controller.js";
 import { RefStore } from "./ref-store.js";
 import { getTool } from "./tools/index.js";
+import { toErrorDetail } from "./tool-error.js";
 import { ERROR_CODES, VERSION } from "@qweb/protocol";
 import type { Message, ToolCallPayload } from "@qweb/protocol";
 
@@ -17,7 +18,7 @@ import "./tools/send-keys.js";
 import "./tools/wait-for.js";
 import "./tools/streaming-status.js";
 import "./tools/upload.js";
-import "./tools/network.js";
+import { clearNetworkCapture } from "./tools/network.js";
 import "./tools/tabs.js";
 import "./tools/save-as-pdf.js";
 
@@ -90,7 +91,7 @@ function connect(): void {
         }
 
         try {
-          const result = await cdp.runExclusive(() => tool.execute(cmd.params, { cdp, refs }));
+          const result = await tool.execute(cmd.params, { cdp, refs });
           sendIfOpen(
             JSON.stringify({
               id: msg.id,
@@ -99,12 +100,12 @@ function connect(): void {
             }),
           );
         } catch (err) {
-          const message = err instanceof Error ? err.message : "Unknown error";
+          const error = toErrorDetail(err);
           sendIfOpen(
             JSON.stringify({
               id: msg.id,
               type: "error",
-              payload: { code: ERROR_CODES.EXECUTION_ERROR, message },
+              payload: error,
             }),
           );
         }
@@ -166,16 +167,26 @@ connect();
 
 // Handle tab removal cleanup
 chrome.tabs.onRemoved.addListener((tabId) => {
-  try {
-    cdp.detach(tabId);
-  } catch {}
+  refs.close(tabId);
+  clearNetworkCapture(tabId);
+  void cdp.close(tabId);
+});
+
+chrome.tabs.onCreated.addListener((tab) => {
+  if (typeof tab.id === "number") cdp.open(tab.id);
+});
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  if (changeInfo.status === "loading") {
+    refs.clear(tabId);
+  }
 });
 
 chrome.debugger.onDetach.addListener(({ tabId }) => {
-  if (tabId) {
-    try {
-      cdp.detach(tabId);
-    } catch {}
+  if (typeof tabId === "number") {
+    refs.clear(tabId);
+    clearNetworkCapture(tabId);
+    cdp.handleDetach(tabId);
   }
 });
 
