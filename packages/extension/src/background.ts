@@ -121,7 +121,7 @@ function connect(): void {
     };
 
     ws.onerror = () => {
-      // onclose will fire after this
+      console.error("[QwebBridge] WebSocket connection error, will reconnect");
     };
   } catch {
     scheduleReconnect();
