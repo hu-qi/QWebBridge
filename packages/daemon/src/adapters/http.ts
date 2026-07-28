@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "http";
 import type { SessionManager } from "../session.js";
+import { randomUUID } from "crypto";
 import { TOOL_NAMES, DAEMON_PORT, ERROR_CODES, VERSION } from "@qweb/protocol";
 
 type ToolName = (typeof TOOL_NAMES)[number];
@@ -86,7 +87,7 @@ export function handleHttpRequest(
 
         const results = await Promise.all(
           requests.map(async (request, index) => {
-            const id = `http-batch-${Date.now()}-${index}`;
+            const id = `http-batch-${randomUUID()}`;
             const commandMsg = {
               id,
               type: "tool_call" as const,
@@ -133,7 +134,7 @@ export function handleHttpRequest(
     req.on("end", async () => {
       try {
         const params = body ? JSON.parse(body) : {};
-        const id = `http-${Date.now()}`;
+        const id = `http-${randomUUID()}`;
         const commandMsg = {
           id,
           type: "tool_call" as const,
