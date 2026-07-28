@@ -1,5 +1,5 @@
 import type { SessionManager } from "../session.js";
-import { TOOL_NAMES, ERROR_CODES } from "@qweb/protocol";
+import { TOOL_NAMES, ERROR_CODES, VERSION } from "@qweb/protocol";
 
 interface MCPRequest {
   jsonrpc: "2.0";
@@ -64,7 +64,7 @@ export function createMCPAdapter(sessionManager: SessionManager): void {
               result: {
                 protocolVersion: "2024-11-05",
                 capabilities: { tools: {} },
-                serverInfo: { name: "qweb-bridge", version: "1.0.1" },
+                serverInfo: { name: "qweb-bridge", version: VERSION },
               },
             };
             process.stdout.write(JSON.stringify(res) + "\n");

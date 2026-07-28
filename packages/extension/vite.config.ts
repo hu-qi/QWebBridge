@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import { resolve } from "path";
-import { copyFileSync, cpSync, existsSync, mkdirSync } from "fs";
+import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import { VERSION } from "@qweb/protocol";
 
 export default defineConfig({
   build: {
@@ -23,7 +24,10 @@ export default defineConfig({
         const staticDir = resolve(__dirname, "static");
         const distDir = resolve(__dirname, "dist");
         if (!existsSync(distDir)) mkdirSync(distDir, { recursive: true });
-        copyFileSync(resolve(staticDir, "manifest.json"), resolve(distDir, "manifest.json"));
+        const manifestPath = resolve(staticDir, "manifest.json");
+        const manifest = JSON.parse(readFileSync(manifestPath, "utf-8")) as Record<string, unknown>;
+        manifest.version = VERSION;
+        writeFileSync(resolve(distDir, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
         copyFileSync(resolve(staticDir, "popup.html"), resolve(distDir, "popup.html"));
         copyFileSync(resolve(staticDir, "popup.js"), resolve(distDir, "popup.js"));
         // Copy icon and _locales directories

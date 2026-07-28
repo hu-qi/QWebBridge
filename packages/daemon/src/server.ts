@@ -1,6 +1,6 @@
 import { WebSocketServer, WebSocket } from "ws";
 import { createServer as createHttpServer } from "http";
-import { WS_PATH, ERROR_CODES } from "@qweb/protocol";
+import { WS_PATH, ERROR_CODES, VERSION } from "@qweb/protocol";
 import { SessionManager } from "./session.js";
 import { handleHttpRequest } from "./adapters/http.js";
 import { loadConfig } from "./config.js";
@@ -66,7 +66,7 @@ export function createServer(
               JSON.stringify({
                 id: msg.id,
                 type: "hello_ack",
-                payload: { status: "connected", extensionVersion: payload.version || "1.0.0" },
+                payload: { status: "connected", extensionVersion: payload.version || VERSION },
               }),
             );
             return;
