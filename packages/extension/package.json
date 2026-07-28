@@ -19,11 +19,7 @@
   "devDependencies": {
     "@types/chrome": "^0.0.268",
     "typescript": "^5.5.0",
-<<<<<<< HEAD
     "vite": "^8.1.5",
-=======
-    "vite": "^8.1.0",
->>>>>>> e03cc41 (chore(deps): bump brace-expansion)
     "vitest": "^3.2.6"
   }
 }
