@@ -21,7 +21,7 @@
     "lint": "pnpm exec eslint src/"
   },
   "devDependencies": {
-    "typescript": "^5.5.0",
+    "typescript": "^7.0.2",
     "vitest": "^3.2.6"
   }
 }
